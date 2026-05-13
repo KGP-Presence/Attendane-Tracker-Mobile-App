@@ -24,6 +24,7 @@
         "foregroundImage": "./assets/icons/adaptive-icon.png",
         "monochromeImage": "./assets/icons/adaptive-icon.png"
       },
+      "versionCode": 4,
       "predictiveBackGestureEnabled": false,
       "package": "com.kgppresence.app",
       "permissions": ["CAMERA"],
