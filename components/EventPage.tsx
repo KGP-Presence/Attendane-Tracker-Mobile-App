@@ -30,7 +30,10 @@ import { useDeleteMultipleEvents, useEvents } from "../hooks/useEvents";
 import { AppEvent, EventType } from "../types/event";
 
 import CustomAlertModal from "./CustomAlertModal";
+import { CopilotOverlay } from "./CopilotOverlay";
 import { EventCreateModal } from "./EventCreateModal";
+import { VoiceRecordingModal } from "./VoiceRecordingModal";
+import { useCopilot } from "../hooks/useCopilot";
 
 // Helper to format dates for section headers
 const formatDateGroup = (isoString: string) => {
@@ -89,15 +92,19 @@ export const EventsScreen = () => {
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const [showCreateSuccessAlert, setShowCreateSuccessAlert] = useState(false);
 
+  // First-time user copilot
+  const { isReady, shouldShow, markComplete } = useCopilot();
+
   // Audio Recording State
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [recordingDurationMs, setRecordingDurationMs] = useState(0);
 
   // Refs needed for Audio progress checks
   const isStoppingRef = useRef(false);
   const recordingRef = useRef<Audio.Recording | null>(null);
   const silenceStartRef = useRef<number | null>(null);
 
-  // NEW: Array of Animated Values for the 5 waveform bars
+  // Array of Animated Values for the waveform bars
   const meteringAnims = useRef([...Array(5)].map(() => new Animated.Value(0)));
 
   // Multi-select State
@@ -238,8 +245,9 @@ export const EventsScreen = () => {
       // This prevents the React Native Network Error when trying to read an unclosed file.
       await new Promise(resolve => setTimeout(resolve, 300));
 
-      // Reset animation values to zero
+      // Reset animation values and duration
       meteringAnims.current.forEach(anim => anim.setValue(0));
+      setRecordingDurationMs(0);
 
       const uri = currentRecording.getURI();
       if (!uri) throw new Error("No recording URI");
@@ -315,6 +323,9 @@ export const EventsScreen = () => {
       }).start();
     });
 
+    // 1b. Track elapsed duration for the modal UI
+    setRecordingDurationMs(status.durationMillis);
+
     // 2. Check Max Duration Limit
     if (status.durationMillis >= MAX_RECORDING_DURATION) {
       console.log("Maximum recording duration reached.");
@@ -370,6 +381,7 @@ export const EventsScreen = () => {
       recordingRef.current = newRecording;
       isStoppingRef.current = false;
       silenceStartRef.current = null;
+      setRecordingDurationMs(0);
     } catch (err) {
       console.error("Failed to start recording", err);
       Toast.show({
@@ -592,42 +604,16 @@ export const EventsScreen = () => {
 
       {!isSelectionMode && (
         <>
-          {/* Audio Record & Waveform Button */}
+          {/* Audio Record Button — always shows mic, modal handles the listening UI */}
           <View className="absolute bottom-60 right-6 z-10 justify-center items-center">
             <TouchableOpacity
               activeOpacity={0.9}
-              className={`w-14 h-14 rounded-full justify-center items-center shadow-lg ${
-                recording
-                  ? "bg-slate-800 shadow-slate-900/50 dark:shadow-none" // Dark pill background while listening
-                  : "bg-indigo-500 shadow-indigo-300 dark:shadow-none"
-              }`}
-              onPress={recording ? stopRecordingAndSubmit : startRecording}
-              disabled={isUploadingAudio}
+              className="w-14 h-14 rounded-full justify-center items-center shadow-lg bg-indigo-500 shadow-indigo-300 dark:shadow-none"
+              onPress={startRecording}
+              disabled={isUploadingAudio || !!recording}
             >
               {isUploadingAudio ? (
                 <ActivityIndicator size="small" color="#ffffff" />
-              ) : recording ? (
-                // NEW: Dynamic Waveforms replacing the mic icon
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-                  {meteringAnims.current.map((anim, i) => (
-                    <Animated.View
-                      key={i}
-                      style={{
-                        width: 3.5,
-                        height: 12,
-                        // Mix of blues and purples to mimic AI listening
-                        backgroundColor: i % 2 === 0 ? '#60A5FA' : '#A855F7', 
-                        borderRadius: 2,
-                        transform: [{
-                          scaleY: anim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [1, 3] // Scale up to 3x based on voice volume
-                          })
-                        }]
-                      }}
-                    />
-                  ))}
-                </View>
               ) : (
                 <MaterialIcons name="mic" size={28} color="#ffffff" />
               )}
@@ -664,6 +650,23 @@ export const EventsScreen = () => {
         message="Event created successfully!"
         type="success"
         onClose={() => setShowCreateSuccessAlert(false)}
+      />
+
+      {/* First-time user copilot onboarding */}
+      {isReady && (
+        <CopilotOverlay
+          visible={shouldShow}
+          onDone={markComplete}
+        />
+      )}
+
+      {/* Immersive voice recording popup */}
+      <VoiceRecordingModal
+        visible={!!recording || isUploadingAudio}
+        meteringAnims={meteringAnims.current}
+        durationMs={recordingDurationMs}
+        isUploading={isUploadingAudio}
+        onStop={stopRecordingAndSubmit}
       />
     </SafeAreaView>
   );
