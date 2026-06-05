@@ -1,4 +1,4 @@
-import { SubjectCardType } from "@/utils/types/timetableTypes";
+import { SubjectCardType } from "@/types/timetableTypes";
 // Note: 'Icon' is a generic name, you likely need a specific icon component passed as a prop
 // or imported dynamically. For this example, I'll assume you pass an Icon component prop.
 import { LucideIcon } from "lucide-react-native";

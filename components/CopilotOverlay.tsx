@@ -67,11 +67,15 @@ const STEPS: CopilotStep[] = [
 interface CopilotOverlayProps {
   visible: boolean;
   onDone: () => void;
+  micCoords?: { cx: number; cy: number; r: number } | null;
+  addCoords?: { cx: number; cy: number; r: number } | null;
 }
 
 export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
   visible,
   onDone,
+  micCoords,
+  addCoords,
 }) => {
   const [step, setStep] = useState(0);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -80,6 +84,13 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
   const glowLoop = useRef(new Animated.Value(0)).current;
 
   const currentStep = STEPS[step];
+
+  // Resolve active spotlight (prefer dynamic measurements over hardcoded fallback coordinates)
+  const activeSpotlight = React.useMemo(() => {
+    if (step === 1 && micCoords) return micCoords;
+    if (step === 2 && addCoords) return addCoords;
+    return currentStep.spotlight;
+  }, [step, currentStep, micCoords, addCoords]);
   const isLast = step === STEPS.length - 1;
 
   const haptic = () => {
@@ -172,8 +183,8 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
       ? SCREEN_H * 0.55
       : currentStep.tooltipPosition === "center"
         ? SCREEN_H * 0.3
-        : currentStep.spotlight
-          ? currentStep.spotlight.cy - currentStep.spotlight.r - 180
+        : activeSpotlight
+          ? activeSpotlight.cy - activeSpotlight.r - 180
           : SCREEN_H * 0.3;
 
   return (
@@ -190,18 +201,18 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
           backgroundColor: "rgba(0,0,0,0.78)",
           opacity: fadeAnim,
         }}
-        pointerEvents="box-none"
+        pointerEvents="auto"
       >
         {/* Spotlight ring */}
-        {currentStep.spotlight && (
+        {activeSpotlight && (
           <Animated.View
             style={{
               position: "absolute",
-              left: currentStep.spotlight.cx - currentStep.spotlight.r - 8,
-              top: currentStep.spotlight.cy - currentStep.spotlight.r - 8,
-              width: (currentStep.spotlight.r + 8) * 2,
-              height: (currentStep.spotlight.r + 8) * 2,
-              borderRadius: currentStep.spotlight.r + 8,
+              left: activeSpotlight.cx - activeSpotlight.r - 8,
+              top: activeSpotlight.cy - activeSpotlight.r - 8,
+              width: (activeSpotlight.r + 8) * 2,
+              height: (activeSpotlight.r + 8) * 2,
+              borderRadius: activeSpotlight.r + 8,
               borderWidth: 2.5,
               borderColor: "#818cf8",
               opacity: glowLoop.interpolate({
@@ -220,15 +231,15 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
             pointerEvents="none"
           />
         )}
-        {currentStep.spotlight && (
+        {activeSpotlight && (
           <View
             style={{
               position: "absolute",
-              left: currentStep.spotlight.cx - currentStep.spotlight.r,
-              top: currentStep.spotlight.cy - currentStep.spotlight.r,
-              width: currentStep.spotlight.r * 2,
-              height: currentStep.spotlight.r * 2,
-              borderRadius: currentStep.spotlight.r,
+              left: activeSpotlight.cx - activeSpotlight.r,
+              top: activeSpotlight.cy - activeSpotlight.r,
+              width: activeSpotlight.r * 2,
+              height: activeSpotlight.r * 2,
+              borderRadius: activeSpotlight.r,
               backgroundColor: "rgba(99,102,241,0.18)",
             }}
             pointerEvents="none"

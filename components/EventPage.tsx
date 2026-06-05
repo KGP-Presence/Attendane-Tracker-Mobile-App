@@ -1,6 +1,6 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useCallback, useMemo, useState, useRef } from "react";
+import React, { useCallback, useMemo, useState, useRef, useEffect } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -94,6 +94,40 @@ export const EventsScreen = () => {
 
   // First-time user copilot
   const { isReady, shouldShow, markComplete } = useCopilot();
+
+  // Refs and state for Copilot spotlight measurements
+  const micButtonRef = useRef<View>(null);
+  const addButtonRef = useRef<View>(null);
+  const [micCoords, setMicCoords] = useState<{ cx: number; cy: number; r: number } | null>(null);
+  const [addCoords, setAddCoords] = useState<{ cx: number; cy: number; r: number } | null>(null);
+
+  useEffect(() => {
+    if (isReady && shouldShow) {
+      const timer = setTimeout(() => {
+        micButtonRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
+          if (width > 0 && height > 0) {
+            setMicCoords({
+              cx: x + width / 2,
+              cy: y + height / 2,
+              r: Math.max(width, height) / 2 + 4,
+            });
+          }
+        });
+
+        addButtonRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
+          if (width > 0 && height > 0) {
+            setAddCoords({
+              cx: x + width / 2,
+              cy: y + height / 2,
+              r: Math.max(width, height) / 2 + 4,
+            });
+          }
+        });
+      }, 600);
+
+      return () => clearTimeout(timer);
+    }
+  }, [isReady, shouldShow]);
 
   // Audio Recording State
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
@@ -605,15 +639,41 @@ export const EventsScreen = () => {
       {!isSelectionMode && (
         <>
           {/* Audio Record Button — always shows mic, modal handles the listening UI */}
-          <View className="absolute bottom-60 right-6 z-10 justify-center items-center">
+          <View ref={micButtonRef} className="absolute bottom-60 right-6 z-10 justify-center items-center">
             <TouchableOpacity
               activeOpacity={0.9}
-              className="w-14 h-14 rounded-full justify-center items-center shadow-lg bg-indigo-500 shadow-indigo-300 dark:shadow-none"
-              onPress={startRecording}
-              disabled={isUploadingAudio || !!recording}
+              className={`w-14 h-14 rounded-full justify-center items-center shadow-lg ${
+                recording
+                  ? "bg-slate-800 shadow-slate-900/50 dark:shadow-none" // Dark pill background while listening
+                  : "bg-indigo-500 shadow-indigo-300 dark:shadow-none"
+              }`}
+              onPress={recording ? stopRecordingAndSubmit : startRecording}
+              disabled={isUploadingAudio}
             >
               {isUploadingAudio ? (
                 <ActivityIndicator size="small" color="#ffffff" />
+              ) : recording ? (
+                // NEW: Dynamic Waveforms replacing the mic icon
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+                  {meteringAnims.current.map((anim, i) => (
+                    <Animated.View
+                      key={i}
+                      style={{
+                        width: 3.5,
+                        height: 12,
+                        // Mix of blues and purples to mimic AI listening
+                        backgroundColor: i % 2 === 0 ? '#60A5FA' : '#A855F7', 
+                        borderRadius: 2,
+                        transform: [{
+                          scaleY: anim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [1, 3] // Scale up to 3x based on voice volume
+                          })
+                        }]
+                      }}
+                    />
+                  ))}
+                </View>
               ) : (
                 <MaterialIcons name="mic" size={28} color="#ffffff" />
               )}
@@ -622,6 +682,7 @@ export const EventsScreen = () => {
 
           {/* Manual Create Button */}
           <TouchableOpacity
+            ref={addButtonRef}
             activeOpacity={0.9}
             className="absolute bottom-40 right-6 bg-blue-600 w-14 h-14 rounded-full justify-center items-center shadow-lg shadow-blue-300 dark:shadow-none z-10"
             onPress={() => {
@@ -657,6 +718,8 @@ export const EventsScreen = () => {
         <CopilotOverlay
           visible={shouldShow}
           onDone={markComplete}
+          micCoords={micCoords}
+          addCoords={addCoords}
         />
       )}
 

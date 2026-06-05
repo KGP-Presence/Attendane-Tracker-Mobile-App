@@ -156,7 +156,7 @@ export default function ForgotPasswordScreen() {
   return (
     <SafeAreaView className="flex-1 bg-slate-50 dark:bg-[#0e121a]">
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         className="flex-1"
       >
         <ScrollView

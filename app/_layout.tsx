@@ -3,10 +3,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import { useEffect, useState } from "react";
 import Toast from "react-native-toast-message";
 import "../global.css";
+import { setLogoutHandler } from "@/utils/api";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,6 +26,11 @@ export default function RootLayout() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
+    setLogoutHandler(() => {
+      queryClient.clear();
+      router.replace("/(auth)/login");
+    });
+
     // Pre-loads token into memory cache before any query fires
     getToken().finally(() => setReady(true));
   }, []);
