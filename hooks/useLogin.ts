@@ -32,17 +32,41 @@ export const useLogin = () => {
     },
 
     onError: (error) => {
-      let message = "Login failed";
+      let title = "Login Failed";
+      let message = "Something went wrong. Please try again.";
 
       if (axios.isAxiosError(error)) {
-        message = error.response?.data?.message || error.message; // 👈 backend message // fallback
+        const status = error.response?.status;
+        const backendMessage: string =
+          error.response?.data?.message || error.message;
+
+        if (
+          status === 401 ||
+          backendMessage.toLowerCase().includes("wrong") ||
+          backendMessage.toLowerCase().includes("credential")
+        ) {
+          title = "Incorrect Password";
+          message = "The password you entered is incorrect. Please try again.";
+        } else if (
+          status === 404 ||
+          backendMessage.toLowerCase().includes("not registered") ||
+          backendMessage.toLowerCase().includes("not found")
+        ) {
+          title = "Account Not Found";
+          message = "No account found with this institute email ID.";
+        } else if (status === 400) {
+          title = "Missing Fields";
+          message = backendMessage;
+        } else {
+          message = backendMessage;
+        }
       }
 
       console.error("Login failed:", error);
 
       Toast.show({
         type: "error",
-        text1: "Login Failed",
+        text1: title,
         text2: message,
         position: "bottom",
       });
