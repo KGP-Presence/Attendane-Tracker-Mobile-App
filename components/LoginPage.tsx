@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   View,
   Text,
@@ -27,6 +27,7 @@ export default function LoginScreen() {
   const [instituteId, setInstituteId] = useState("");
 
   const {mutate, isPending} = useLogin();
+  const scrollRef = useRef<ScrollView>(null);
 
   const handleSubmit = () => {
 
@@ -46,12 +47,16 @@ export default function LoginScreen() {
   return (
     <SafeAreaView className="flex-1 bg-[#f6f6f8] dark:bg-[#101622]">
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
         className="flex-1"
       >
-        <ScrollView 
+        <ScrollView
+          ref={scrollRef}
           contentContainerStyle={{ flexGrow: 1 }}
-          keyboardShouldPersistTaps="handled">
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}>
           {/* Top Bar */}
           <View className="flex-row items-center justify-between px-4 py-4">
             <TouchableOpacity className="p-2">
@@ -90,10 +95,10 @@ export default function LoginScreen() {
             {/* Institute ID */}
             <View>
               <Text className="text-[#111318] dark:text-white text-base font-medium mb-2">
-                Institute ID
+                Institute Email ID
               </Text>
               <TextInput
-                placeholder="Enter your ID"
+                placeholder="Enter your institute email ID"
                 placeholderTextColor="#616f89"
                 className="w-full h-14 bg-white dark:bg-slate-800 border border-[#dbdfe6] dark:border-slate-700 rounded-xl px-4 text-[#111318] dark:text-white focus:border-[#135bec]"
                 value={instituteId}
@@ -114,6 +119,11 @@ export default function LoginScreen() {
                   className="w-full h-14 bg-white dark:bg-slate-800 border border-[#dbdfe6] dark:border-slate-700 rounded-xl px-4 pr-12 text-[#111318] dark:text-white focus:border-[#135bec]"
                   value={password}
                   onChangeText={setPassword}
+                  onFocus={() => {
+                    setTimeout(() => {
+                      scrollRef.current?.scrollToEnd({ animated: true });
+                    }, 120);
+                  }}
                 />
                 <TouchableOpacity
                   onPress={() => setPasswordVisible(!passwordVisible)}
