@@ -1,9 +1,3 @@
-// Note: This code is built for a React Native / Expo environment.
-// The compilation errors you are seeing in the preview are because the web-based 
-// canvas does not support native modules like 'react-native', 'expo-av', etc.
-// Please copy this code into your local Expo project to run it successfully.
-
-import { useMe } from "@/hooks/useMe";
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useCallback, useMemo, useState, useRef } from "react";
