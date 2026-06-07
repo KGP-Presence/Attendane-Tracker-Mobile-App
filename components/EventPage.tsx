@@ -25,6 +25,7 @@ import { Audio } from "expo-av";
 import * as Haptics from "expo-haptics";
 import { ChevronLeft, User } from "lucide-react-native";
 import Toast from "react-native-toast-message";
+import { useIsFocused } from "@react-navigation/native";
 import { useAddEventFromAudio } from "../hooks/useAddEvent";
 import { useDeleteMultipleEvents, useEvents } from "../hooks/useEvents";
 import { AppEvent, EventType } from "../types/event";
@@ -94,6 +95,7 @@ export const EventsScreen = () => {
 
   // First-time user copilot
   const { isReady, shouldShow, markComplete } = useCopilot();
+  const isFocused = useIsFocused();
 
   // Refs and state for Copilot spotlight measurements
   const micButtonRef = useRef<View>(null);
@@ -713,8 +715,8 @@ export const EventsScreen = () => {
         onClose={() => setShowCreateSuccessAlert(false)}
       />
 
-      {/* First-time user copilot onboarding */}
-      {isReady && (
+      {/* First-time user copilot onboarding — only when Events tab is focused */}
+      {isReady && isFocused && (
         <CopilotOverlay
           visible={shouldShow}
           onDone={markComplete}

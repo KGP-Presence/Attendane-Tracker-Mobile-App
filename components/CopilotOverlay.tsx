@@ -214,7 +214,7 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
               height: (activeSpotlight.r + 8) * 2,
               borderRadius: activeSpotlight.r + 8,
               borderWidth: 2.5,
-              borderColor: "#818cf8",
+              borderColor: "#3B82F6",
               opacity: glowLoop.interpolate({
                 inputRange: [0, 1],
                 outputRange: [0.6, 1],
@@ -240,7 +240,7 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
               width: activeSpotlight.r * 2,
               height: activeSpotlight.r * 2,
               borderRadius: activeSpotlight.r,
-              backgroundColor: "rgba(99,102,241,0.18)",
+              backgroundColor: "rgba(19,91,236,0.18)",
             }}
             pointerEvents="none"
           />
@@ -258,16 +258,16 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
         >
           <View
             style={{
-              backgroundColor: "#1e1b4b",
+              backgroundColor: "#101622",
               borderRadius: 24,
               padding: 24,
-              shadowColor: "#6366f1",
+              shadowColor: "#135bec",
               shadowOffset: { width: 0, height: 12 },
               shadowOpacity: 0.5,
               shadowRadius: 30,
               elevation: 25,
               borderWidth: 1,
-              borderColor: "rgba(99,102,241,0.35)",
+              borderColor: "rgba(19,91,236,0.35)",
             }}
           >
             {/* Icon badge */}
@@ -276,7 +276,7 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
                 width: 52,
                 height: 52,
                 borderRadius: 16,
-                backgroundColor: "rgba(99,102,241,0.25)",
+                backgroundColor: "rgba(19,91,236,0.2)",
                 alignItems: "center",
                 justifyContent: "center",
                 marginBottom: 16,
@@ -285,7 +285,7 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
               <MaterialIcons
                 name={currentStep.icon}
                 size={28}
-                color="#818cf8"
+                color="#60A5FA"
               />
             </View>
 
@@ -305,7 +305,7 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
             {/* Description */}
             <Text
               style={{
-                color: "#c7d2fe",
+                color: "#CBD5E1",
                 fontSize: 14,
                 lineHeight: 22,
                 marginBottom: 24,
@@ -331,7 +331,7 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
                       width: i === step ? 18 : 6,
                       height: 6,
                       borderRadius: 3,
-                      backgroundColor: i === step ? "#818cf8" : "#3730a3",
+                      backgroundColor: i === step ? "#3B82F6" : "#1E3A5F",
                     }}
                   />
                 ))}
@@ -343,7 +343,7 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
                   <TouchableOpacity onPress={skip} activeOpacity={0.7}>
                     <Text
                       style={{
-                        color: "#6366f1",
+                        color: "#3B82F6",
                         fontSize: 14,
                         fontWeight: "600",
                       }}
@@ -356,7 +356,7 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
                   onPress={goNext}
                   activeOpacity={0.85}
                   style={{
-                    backgroundColor: "#6366f1",
+                    backgroundColor: "#135bec",
                     paddingHorizontal: 22,
                     paddingVertical: 10,
                     borderRadius: 12,
