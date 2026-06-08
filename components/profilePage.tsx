@@ -41,6 +41,7 @@ export default function UserProfile() {
   const [biometricAvailable, setBiometricAvailable] = React.useState(false);
   const [biometricEnabled, setBiometricEnabledState] = React.useState(false);
   const [biometricType, setBiometricType] = React.useState("Biometrics");
+  const [isCgpaVisible, setIsCgpaVisible] = React.useState(false);
 
 
   const onRefresh = React.useCallback(async () => {
@@ -246,7 +247,7 @@ export default function UserProfile() {
         </View>
 
         {/* CGPA Simulator */}
-        <CgpaSimulator />
+        <CgpaSimulator visible={isCgpaVisible} onClose={() => setIsCgpaVisible(false)} />
 
         {/* Section: Academic Management */}
         <View className="px-4 mt-6">
@@ -279,7 +280,7 @@ export default function UserProfile() {
 
             {/* List Item 2 */}
             <TouchableOpacity
-              className="flex-row items-center w-full p-4 active:bg-gray-50 dark:active:bg-gray-800"
+              className="flex-row items-center w-full p-4 border-b border-gray-100 dark:border-gray-700 active:bg-gray-50 dark:active:bg-gray-800"
               onPress={() => {
                 Vibration.vibrate(20);
                 router.push("/subject/getAllSubjects");
@@ -294,13 +295,27 @@ export default function UserProfile() {
                 </Text>
               </View>
               <View className="flex-row items-center gap-2">
-                {/* <View className="bg-gray-100 dark:bg-gray-700 px-2.5 py-1 rounded-full">
-                  <Text className="text-gray-600 dark:text-gray-300 text-xs font-bold">
-                    6
-                  </Text>
-                </View> */}
                 <MaterialIcons name="chevron-right" size={24} color="#9ca3af" />
               </View>
+            </TouchableOpacity>
+
+            {/* List Item 3 */}
+            <TouchableOpacity
+              className="flex-row items-center w-full p-4 active:bg-gray-50 dark:active:bg-gray-800"
+              onPress={() => {
+                Vibration.vibrate(20);
+                setIsCgpaVisible(true);
+              }}
+            >
+              <View className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#135bec]/10 mr-4">
+                <MaterialIcons name="calculate" size={20} color="#135bec" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-[#111318] dark:text-white text-base font-medium">
+                  SGPA Estimator
+                </Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={24} color="#9ca3af" />
             </TouchableOpacity>
           </View>
         </View>
