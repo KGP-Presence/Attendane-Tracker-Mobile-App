@@ -26,6 +26,7 @@ import {
   authenticate,
   getBiometricType,
 } from "@/utils/biometric";
+import CgpaSimulator from "@/components/CgpaSimulator";
 
 export default function UserProfile() {
   const { data, refetch } = useMe(); // Added refetch if your hook supports it
@@ -243,6 +244,9 @@ export default function UserProfile() {
             </View>
           </View>
         </View>
+
+        {/* CGPA Simulator */}
+        <CgpaSimulator />
 
         {/* Section: Academic Management */}
         <View className="px-4 mt-6">
