@@ -30,9 +30,9 @@ const TABBAR_STEPS: CopilotStep[] = [
     tooltipPosition: "top",
   },
   {
-    title: "Settings",
-    description: "Customize your profile, app preferences, and view insights.",
-    icon: "settings",
+    title: "Overview",
+    description: "Your detailed attendance breakdown. See semester stats, subject progress, and more.",
+    icon: "analytics",
     tooltipPosition: "top",
   },
 ];

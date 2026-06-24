@@ -28,6 +28,7 @@ interface CopilotOverlayProps {
   onDone: () => void;
   steps: CopilotStep[];
   spotlightMeasurements?: Record<number, { cx: number; cy: number; width: number; height: number; borderRadius: number } | null>;
+  onStepChange?: (step: number) => void;
 }
 
 export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
@@ -35,6 +36,7 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
   onDone,
   steps,
   spotlightMeasurements = {},
+  onStepChange,
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -122,9 +124,10 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
   useEffect(() => {
     if (visible) {
       setStep(0);
+      onStepChange?.(0);
       animateIn();
     }
-  }, [visible]);
+  }, [visible, onStepChange]);
 
   const goNext = () => {
     haptic();
@@ -141,7 +144,11 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
       duration: 180,
       useNativeDriver: true,
     }).start(() => {
-      setStep((s) => s + 1);
+      setStep((s) => {
+        const next = s + 1;
+        onStepChange?.(next);
+        return next;
+      });
       animateIn();
     });
   };
@@ -159,10 +166,10 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
   const getTooltipStyle = () => {
     if (currentStep.tooltipPosition === "bottom") {
       const topPos = activeSpotlight ? activeSpotlight.cy + activeSpotlight.height / 2 + 16 : SCREEN_H * 0.55;
-      return { top: Math.min(topPos, SCREEN_H - 220) };
+      return { top: Math.min(topPos, SCREEN_H - 280) };
     } else if (currentStep.tooltipPosition === "top") {
       const bottomPos = activeSpotlight ? SCREEN_H - activeSpotlight.cy + activeSpotlight.height / 2 + 16 : SCREEN_H * 0.55;
-      return { bottom: Math.min(bottomPos, SCREEN_H - 220) };
+      return { bottom: Math.min(bottomPos, SCREEN_H - 280) };
     } else {
       // center
       return { top: SCREEN_H * 0.3 };
