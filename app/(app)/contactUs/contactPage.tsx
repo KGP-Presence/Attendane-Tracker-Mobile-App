@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -21,6 +21,10 @@ import {
 } from "lucide-react-native";
 import { useColorScheme } from "nativewind";
 import { router } from "expo-router";
+import { MaterialIcons } from "@expo/vector-icons";
+import { MessageSquare } from "lucide-react-native";
+import FeedbackModal from "@/components/FeedbackModal";
+import BugReportModal from "@/components/BugReportModal";
 
 interface TeamMemberData {
   id: string;
@@ -149,6 +153,9 @@ export default function KGPPresence(): React.JSX.Element {
     return shuffleArray(TEAM_DATA);
   }, []);
 
+  const [feedbackVisible, setFeedbackVisible] = useState(false);
+  const [bugReportVisible, setBugReportVisible] = useState(false);
+
   return (
     <SafeAreaView className="flex-1 bg-background-light dark:bg-background-dark">
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
@@ -230,6 +237,63 @@ export default function KGPPresence(): React.JSX.Element {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Feedback & Bug Report Section */}
+        <View className="px-4 mt-2 mb-4">
+          <View className="flex-row gap-3">
+            {/* Send Feedback Card */}
+            <TouchableOpacity
+              className="flex-1 bg-[#135bec]/5 border border-[#135bec]/20 rounded-2xl p-4 items-center"
+              onPress={() => {
+                Vibration.vibrate(20);
+                setFeedbackVisible(true);
+              }}
+            >
+              <View className="w-12 h-12 bg-[#135bec]/10 items-center justify-center rounded-full mb-3">
+                <MessageSquare size={22} color="#135bec" />
+              </View>
+              <Text className="text-base font-bold text-slate-900 dark:text-white mb-1">
+                Send Feedback
+              </Text>
+              <Text className="text-slate-500 dark:text-slate-400 text-xs text-center">
+                Share your thoughts
+              </Text>
+            </TouchableOpacity>
+
+            {/* Report Bug Card */}
+            <TouchableOpacity
+              className="flex-1 bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 items-center"
+              onPress={() => {
+                Vibration.vibrate(20);
+                setBugReportVisible(true);
+              }}
+            >
+              <View className="w-12 h-12 bg-amber-500/10 items-center justify-center rounded-full mb-3">
+                <MaterialIcons name="bug-report" size={24} color="#f59e0b" />
+              </View>
+              <Text className="text-base font-bold text-slate-900 dark:text-white mb-1">
+                Report Bug
+              </Text>
+              <Text className="text-slate-500 dark:text-slate-400 text-xs text-center">
+                Help us fix issues
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text className="text-slate-400 text-xs text-center mt-3">
+            Your feedback helps us improve KGP Presence
+          </Text>
+        </View>
+
+        {/* Modals */}
+        <FeedbackModal
+          visible={feedbackVisible}
+          onClose={() => setFeedbackVisible(false)}
+        />
+        <BugReportModal
+          visible={bugReportVisible}
+          onClose={() => setBugReportVisible(false)}
+        />
 
         {/* Footer */}
         <View className="pb-12 items-center">

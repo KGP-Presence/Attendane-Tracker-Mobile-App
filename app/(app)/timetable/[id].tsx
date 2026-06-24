@@ -210,6 +210,7 @@ export default function TimetableScreen() {
             {/* Circular Gauge */}
             <View className="w-32 h-32 relative items-center justify-center mr-4">
               <Svg
+                onLayout={() => {}}
                 width="100%"
                 height="100%"
                 viewBox="0 0 36 36"

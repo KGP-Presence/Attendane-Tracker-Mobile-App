@@ -22,6 +22,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useColorScheme } from "nativewind";
 import ErrorScreen from "@/components/ErrorPage";
 import * as Haptics from "expo-haptics";
+import { TimetableCopilot } from "@/components/copilot/TimetableCopilot";
 
 export default function TimetableScreen() {
   // Destructure refetch from your custom hook
@@ -32,6 +33,11 @@ export default function TimetableScreen() {
   // State for semester filtering
   const [selectedSemester, setSelectedSemester] = useState<number | "All" | null>(null);
   const [isFilterModalVisible, setFilterModalVisible] = useState(false);
+
+  // Refs for Copilot spotlight
+  const searchRef = React.useRef<View>(null);
+  const filterRef = React.useRef<View>(null);
+  const addRef = React.useRef<View>(null);
 
   // Extract unique semesters and sort them descending (highest first)
   const uniqueSemesters = useMemo(() => {
@@ -122,7 +128,7 @@ export default function TimetableScreen() {
 
         {/* Search Bar & Filter Button */}
         <View className="mb-2 flex-row items-center space-x-2">
-          <View className="flex-1 flex-row items-center rounded-xl bg-slate-100 dark:bg-slate-800 px-4 h-12 mr-2">
+          <View ref={searchRef} className="flex-1 flex-row items-center rounded-xl bg-slate-100 dark:bg-slate-800 px-4 h-12 mr-2">
             <Search size={20} color="#616f89" />
             <TextInput
               placeholder="Search timetables"
@@ -133,6 +139,7 @@ export default function TimetableScreen() {
             />
           </View>
           <TouchableOpacity 
+            ref={filterRef}
             className="h-12 w-12 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800"
             onPress={() => setFilterModalVisible(true)}
           >
@@ -172,6 +179,7 @@ export default function TimetableScreen() {
 
       {/* Floating Action Button */}
       <TouchableOpacity
+        ref={addRef}
         style={{
           elevation: 8,
           shadowColor: "#000",
@@ -247,6 +255,9 @@ export default function TimetableScreen() {
           </TouchableWithoutFeedback>
         </TouchableOpacity>
       </Modal>
+
+      {/* Timetable Page Copilot */}
+      <TimetableCopilot searchRef={searchRef} filterRef={filterRef} addRef={addRef} />
     </SafeAreaView>
   );
 }

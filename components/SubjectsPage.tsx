@@ -28,6 +28,7 @@ import { useGetSubjectsByTimetableId } from "@/hooks/useGetSubjectByTimetable";
 import { SubjectInterface } from "@/types/subjectTypes";
 import { TimetableInterface } from "@/types/timetableTypes";
 import { Platform } from "react-native";
+import { SubjectCopilot } from "./copilot/SubjectCopilot";
 
 interface FilterOptions {
   Semester: string[];
@@ -61,6 +62,12 @@ export default function SubjectsPage() {
   console.log("Selected IDs:", selectedIds);
   const [isManualSelectionMode, setIsManualSelectionMode] = useState(false);
   const isSelectionMode = selectedIds.length > 0 || isManualSelectionMode;
+
+  // Refs for Copilot spotlight
+  const searchRef = React.useRef<View>(null);
+  const filterRef = React.useRef<View>(null);
+  const menuRef = React.useRef<View>(null);
+  const addRef = React.useRef<View>(null);
 
   // Menus State
   const [headerMenuVisible, setHeaderMenuVisible] = useState(false);
@@ -749,6 +756,7 @@ export default function SubjectsPage() {
 
           <View>
             <TouchableOpacity
+              ref={menuRef}
               onPress={() => {
                 if (Platform.OS === "android") {
                   Vibration.vibrate(20);
@@ -827,7 +835,7 @@ export default function SubjectsPage() {
 
       {/* Search & Filters */}
       <View className="px-3 pb-4 bg-gray-50 dark:bg-slate-950">
-        <View className="flex-row items-center bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-1 mb-4">
+        <View ref={searchRef} className="flex-row items-center bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl px-4 py-1 mb-4">
           <Ionicons
             name="search"
             size={20}
@@ -843,10 +851,11 @@ export default function SubjectsPage() {
         </View>
 
         {/* Horizontal Scroll Filters */}
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={Object.keys(filterOptions) as FilterCategory[]}
+        <View ref={filterRef}>
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={Object.keys(filterOptions) as FilterCategory[]}
           keyExtractor={(item) => item}
           renderItem={({ item }) => {
             const isSelected = selectedFilters[item] !== item;
@@ -873,6 +882,7 @@ export default function SubjectsPage() {
             );
           }}
         />
+        </View>
         {renderFilterDropdown()}
       </View>
 
@@ -904,6 +914,7 @@ export default function SubjectsPage() {
       {/* Floating Action Button (FAB) - Hide when selecting items */}
       {!isSelectionMode && (
         <TouchableOpacity
+          ref={addRef}
           onPress={() => {
             if (Platform.OS === "android") {
               Vibration.vibrate(20);
@@ -917,6 +928,9 @@ export default function SubjectsPage() {
           <Ionicons name="add" size={30} color="white" />
         </TouchableOpacity>
       )}
+
+      {/* Subject Page Copilot */}
+      <SubjectCopilot searchRef={searchRef} filterRef={filterRef} menuRef={menuRef} addRef={addRef} />
     </SafeAreaView>
   );
 }
