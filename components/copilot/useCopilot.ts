@@ -3,27 +3,51 @@ import { useCallback, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 
 export const useCopilot = (storageKey: string) => {
-  const [shouldShow, setShouldShow] = useState(true);
+  const [isReady, setIsReady] = useState(false);
+  const [shouldShow, setShouldShow] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
-      // DEV MODE: Reset to true every time the screen comes into focus
-      // This means you can just switch tabs to re-trigger the copilot, no reload/login needed!
-      // Remember to revert this back to value === null once we're done drilling!
-      setShouldShow(true);
-    }, [])
+      let isMounted = true;
+      const checkStatus = async () => {
+        try {
+          const value = await AsyncStorage.getItem(storageKey);
+          if (isMounted) {
+            setShouldShow(value !== "done");
+            setIsReady(true);
+          }
+        } catch (error) {
+          console.error("Failed to read copilot status:", error);
+          if (isMounted) {
+            setIsReady(true);
+          }
+        }
+      };
+
+      checkStatus();
+      return () => {
+        isMounted = false;
+      };
+    }, [storageKey])
   );
 
   const markComplete = useCallback(async () => {
-    // DEV MODE: Don't persist the 'done' state so it shows up again on reload/focus.
-    // await AsyncStorage.setItem(storageKey, "done");
-    setShouldShow(false);
+    try {
+      await AsyncStorage.setItem(storageKey, "done");
+      setShouldShow(false);
+    } catch (error) {
+      console.error("Failed to save copilot status:", error);
+    }
   }, [storageKey]);
 
   const resetCopilot = useCallback(async () => {
-    await AsyncStorage.removeItem(storageKey);
-    setShouldShow(true);
+    try {
+      await AsyncStorage.removeItem(storageKey);
+      setShouldShow(true);
+    } catch (error) {
+      console.error("Failed to reset copilot status:", error);
+    }
   }, [storageKey]);
 
-  return { isReady: true, shouldShow, markComplete, resetCopilot };
+  return { isReady, shouldShow, markComplete, resetCopilot };
 };

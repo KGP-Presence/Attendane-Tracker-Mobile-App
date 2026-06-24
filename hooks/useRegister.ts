@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api, userApi } from '@/utils/api'
 import { useMutation } from "@tanstack/react-query";
 import axios, { AxiosInstance } from "axios";
@@ -15,6 +16,11 @@ export const useRegister = () => {
             return userApi.register({ api, ...data });
         },
         onSuccess: async (data) => {
+            try {
+                await AsyncStorage.setItem("@kgp_presence_just_registered", "true");
+            } catch (e) {
+                console.error("Failed to set register flag:", e);
+            }
             Toast.show({
                 type: "success",
                 text1: "Registration successful",

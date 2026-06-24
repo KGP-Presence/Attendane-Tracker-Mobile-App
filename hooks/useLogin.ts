@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { api, userApi } from "@/utils/api";
 import { saveToken } from "@/utils/token";
 import { useMutation } from "@tanstack/react-query";
@@ -23,6 +24,27 @@ export const useLogin = () => {
 
       await saveToken(accessToken, refreshToken);
       console.log("JWT and Refresh Token saved successfully");
+
+      try {
+        const justRegistered = await AsyncStorage.getItem("@kgp_presence_just_registered");
+        if (justRegistered === "true") {
+          await AsyncStorage.removeItem("@kgp_presence_just_registered");
+        } else {
+          // If they just logged in without registering on this device, skip copilots
+          const keys = [
+            "@kgp_presence_dashboard_copilot_done",
+            "@kgp_presence_timetable_copilot_done",
+            "@kgp_presence_subject_copilot_done",
+            "@kgp_presence_event_copilot_done",
+            "@kgp_presence_details_copilot_done",
+            "@kgp_presence_tabbar_copilot_done"
+          ];
+          await Promise.all(keys.map(key => AsyncStorage.setItem(key, "done")));
+        }
+      } catch (e) {
+        console.error("Failed to handle copilot keys during login:", e);
+      }
+
       Toast.show({
         type: "success",
         text1: "Login Successful",
