@@ -59,9 +59,9 @@ const formatDateGroup = (isoString: string) => {
 const EVENT_TYPES = ["All", "Exam", "Assignment", "Test", "Other"];
 
 // Constants for Audio Limits and Silence Detection
-const MAX_RECORDING_DURATION = 15000; // 15 seconds max length
-const SILENCE_TIMEOUT = 1500; // 3 seconds of continuous silence to trigger auto-stop
-const SILENCE_THRESHOLD = -40; // Decibel (dB) threshold for silence
+const MAX_RECORDING_DURATION = 14000; // 14 seconds to leave a 1s safety buffer for the backend limit
+const SILENCE_TIMEOUT = 2000; // 2 seconds of continuous silence to trigger auto-stop
+const SILENCE_THRESHOLD = -35; // Decibel (dB) threshold for silence
 
 export const EventsScreen = () => {
   const { data: events, isLoading, isError, refetch } = useEvents();
@@ -91,6 +91,7 @@ export const EventsScreen = () => {
   const [isTypeMenuOpen, setIsTypeMenuOpen] = useState(false);
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const [showCreateSuccessAlert, setShowCreateSuccessAlert] = useState(false);
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
 
   // Refs for Copilot spotlight measurements
   const micButtonRef = useRef<View>(null);
@@ -191,7 +192,7 @@ export const EventsScreen = () => {
 
               Toast.show({
                 type: "success",
-                text1: "Events Deleted 🗑️",
+                text1: "Events Deleted",
                 text2: "The selected events were permanently removed.",
               });
             } catch (error) {
@@ -234,17 +235,16 @@ export const EventsScreen = () => {
     const currentRecording = recordingRef.current;
 
     try {
-      // Clear UI state immediately
+      // Clear recording ref and state but keep modal visible during upload
       setRecording(null);
       recordingRef.current = null;
 
-      // FIX: Detach the listener FIRST so it doesn't fire while we are unloading
+      // Detach the listener FIRST so it doesn't fire while we are unloading
       currentRecording.setOnRecordingStatusUpdate(null);
       
       await currentRecording.stopAndUnloadAsync();
 
-      // FIX: Give the filesystem a tiny amount of time to actually finalize the file.
-      // This prevents the React Native Network Error when trying to read an unclosed file.
+      // Give the filesystem time to finalize the file
       await new Promise(resolve => setTimeout(resolve, 300));
 
       // Reset animation values and duration
@@ -252,7 +252,14 @@ export const EventsScreen = () => {
       setRecordingDurationMs(0);
 
       const uri = currentRecording.getURI();
-      if (!uri) throw new Error("No recording URI");
+      if (!uri) {
+        Toast.show({
+          type: "error",
+          text1: "Recording Error",
+          text2: "Something went wrong while saving. Please try again.",
+        });
+        return;
+      }
 
       const fileExt = uri.split(".").pop() || "m4a";
       const normalizedUri =
@@ -272,19 +279,33 @@ export const EventsScreen = () => {
 
       Toast.show({
         type: "success",
-        text1: "Event created 🎙️",
-        text2: "Your event was successfully extracted from the audio.",
+        text1: "Event Created",
+        text2: "Your voice note was converted into an event.",
       });
-    } catch (error : any) {
-      console.log("Upload Error Details:", error);
-      
-      let title = "Upload Failed";
-      let message = "Could not process the audio. Is your backend reachable?";
+    } catch (error: any) {
+      console.log("Audio upload error:", error);
 
-      // Handle Backend Rate Limiting (429 Too Many Requests)
-      if (error?.response?.status === 429 || error?.message?.includes('429')) {
-        title = "Daily Limit Reached ⏳";
-        message = "Our daily audio processing limit has been reached. Please try typing your event or try again tomorrow!";
+      let title = "Couldn't Create Event";
+      let message = "Something went wrong. Please try again or create the event manually.";
+
+      const status = error?.response?.status;
+      const backendMsg: string = error?.response?.data?.message || "";
+
+      if (status === 429 || error?.message?.includes("429")) {
+        title = "Daily Limit Reached";
+        message = "Voice event creation limit reached for today. You can still create events manually.";
+      } else if (status === 413) {
+        title = "Recording Too Large";
+        message = "The audio file was too large to process. Try a shorter recording.";
+      } else if (status === 422 || backendMsg.toLowerCase().includes("could not extract")) {
+        title = "Couldn't Understand";
+        message = "We couldn't extract event details from the audio. Try speaking more clearly.";
+      } else if (status && status >= 500) {
+        title = "Server Busy";
+        message = "Our servers are temporarily busy. Please try again in a moment.";
+      } else if (error?.message?.includes("Network") || error?.message?.includes("timeout")) {
+        title = "Connection Issue";
+        message = "Please check your internet connection and try again.";
       }
 
       Toast.show({
@@ -292,15 +313,9 @@ export const EventsScreen = () => {
         text1: title,
         text2: message,
       });
-
-      // console.error("Upload Error Details:", error);
-      // Toast.show({
-      //   type: "error",
-      //   text1: "Upload Failed",
-      //   text2: "Could not process the audio. Is your backend reachable?",
-      // });
     } finally {
       isStoppingRef.current = false;
+      setShowVoiceModal(false);
     }
   };
 
@@ -316,11 +331,10 @@ export const EventsScreen = () => {
     // Animate each bar with slight phase multipliers so they wave naturally
     const waveMultipliers = [0.5, 0.8, 1.2, 0.8, 0.5];
     meteringAnims.current.forEach((anim, i) => {
-      // Add slight randomness to make it feel organic
       const targetValue = Math.max(0.1, normalizedLevel * waveMultipliers[i] * (0.8 + Math.random() * 0.4));
       Animated.timing(anim, {
         toValue: targetValue,
-        duration: 150, // Matches roughly the polling interval
+        duration: 150,
         useNativeDriver: true,
       }).start();
     });
@@ -328,26 +342,24 @@ export const EventsScreen = () => {
     // 1b. Track elapsed duration for the modal UI
     setRecordingDurationMs(status.durationMillis);
 
-    // 2. Check Max Duration Limit
+    // 2. Check Max Duration Limit — gracefully stop and SUBMIT the recording
     if (status.durationMillis >= MAX_RECORDING_DURATION) {
-      console.log("Maximum recording duration reached.");
       await stopRecordingAndSubmit();
       return;
     }
 
-    // 3. Check Audio Silence (Auto-stop)
+    // 3. Check Audio Silence (Auto-stop and submit)
     if (currentMetering < SILENCE_THRESHOLD) {
       if (silenceStartRef.current === null) {
         silenceStartRef.current = status.durationMillis;
       } else {
         const silentDuration = status.durationMillis - silenceStartRef.current;
         if (silentDuration >= SILENCE_TIMEOUT) {
-          console.log("Auto-stopping due to prolonged silence.");
           await stopRecordingAndSubmit();
         }
       }
     } else {
-      silenceStartRef.current = null; // Reset silence tracker if user speaks
+      silenceStartRef.current = null;
     }
   }, []);
 
@@ -356,7 +368,6 @@ export const EventsScreen = () => {
       if (Platform.OS === "android") Vibration.vibrate(20);
       else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-      // 🛑 The Hard Gate
       const hasPermission = await ensureAudioPermission();
       if (!hasPermission) return;
       
@@ -368,14 +379,13 @@ export const EventsScreen = () => {
 
       const recordingOptions = {
         ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
-        isMeteringEnabled: true, // Required for waveform and silence detection
+        isMeteringEnabled: true,
       };
 
       const { recording: newRecording } = await Audio.Recording.createAsync(
         recordingOptions
       );
 
-      // We set update interval to 150ms for smoother animation frames
       newRecording.setProgressUpdateInterval(150);
       newRecording.setOnRecordingStatusUpdate(onRecordingStatusUpdate);
 
@@ -384,12 +394,13 @@ export const EventsScreen = () => {
       isStoppingRef.current = false;
       silenceStartRef.current = null;
       setRecordingDurationMs(0);
+      setShowVoiceModal(true);
     } catch (err) {
       console.error("Failed to start recording", err);
       Toast.show({
         type: "error",
-        text1: "Recording Failed",
-        text2: "Could not start audio recording.",
+        text1: "Microphone Unavailable",
+        text2: "Could not access the microphone. Please check your permissions.",
       });
     }
   };
@@ -693,7 +704,7 @@ export const EventsScreen = () => {
 
       {/* Immersive voice recording popup */}
       <VoiceRecordingModal
-        visible={!!recording || isUploadingAudio}
+        visible={showVoiceModal}
         meteringAnims={meteringAnims.current}
         durationMs={recordingDurationMs}
         isUploading={isUploadingAudio}

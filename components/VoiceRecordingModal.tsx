@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Vibration,
   View,
+  useColorScheme,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -33,6 +34,23 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
   isUploading,
   onStop,
 }) => {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+
+  // Theme-matched colors (emerald)
+  const primaryColor = "#059669";       // emerald-600
+  const primaryLight = "#34d399";       // emerald-400
+  const primaryDark = "#047857";        // emerald-700
+  const glowColor = "#10b981";          // emerald-500
+  const accentLight = "#a7f3d0";        // emerald-200
+  const accentMuted = "#6ee7b7";        // emerald-300
+  const overlayBg = isDark ? "rgba(2,6,23,0.92)" : "rgba(0,0,0,0.82)";
+  const textPrimary = "#ffffff";
+  const textSecondary = isDark ? "#a7f3d0" : "#d1fae5";
+  const textMuted = isDark ? "#6ee7b7" : "#a7f3d0";
+  const tipBg = isDark ? "rgba(5,150,105,0.15)" : "rgba(16,185,129,0.12)";
+  const tipBorder = isDark ? "rgba(52,211,153,0.3)" : "rgba(5,150,105,0.25)";
+
   // Pulsing glow ring animation
   const glowAnim = useRef(new Animated.Value(0)).current;
   // Fade-in animation for the whole modal content
@@ -114,7 +132,7 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
       <View
         style={{
           flex: 1,
-          backgroundColor: "rgba(0,0,0,0.82)",
+          backgroundColor: overlayBg,
           justifyContent: "center",
           alignItems: "center",
         }}
@@ -130,7 +148,7 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
           {/* Title */}
           <Text
             style={{
-              color: "#ffffff",
+              color: textPrimary,
               fontSize: 13,
               fontWeight: "600",
               letterSpacing: 3,
@@ -139,7 +157,7 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
               opacity: 0.6,
             }}
           >
-            AI Listening
+            Recording
           </Text>
 
           {/* Glow Ring + Mic Button */}
@@ -151,7 +169,7 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
                 width: 136,
                 height: 136,
                 borderRadius: 68,
-                backgroundColor: "#6366f1",
+                backgroundColor: glowColor,
                 opacity: glowOpacity,
                 transform: [{ scale: glowScale }],
               }}
@@ -163,7 +181,7 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
                 width: 120,
                 height: 120,
                 borderRadius: 60,
-                backgroundColor: "#818cf8",
+                backgroundColor: primaryLight,
                 opacity: glowAnim.interpolate({
                   inputRange: [0, 1],
                   outputRange: [0.15, 0.45],
@@ -190,17 +208,17 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
                 width: 96,
                 height: 96,
                 borderRadius: 48,
-                backgroundColor: "#4f46e5",
+                backgroundColor: primaryColor,
                 alignItems: "center",
                 justifyContent: "center",
-                shadowColor: "#6366f1",
+                shadowColor: glowColor,
                 shadowOffset: { width: 0, height: 8 },
                 shadowOpacity: 0.7,
                 shadowRadius: 20,
                 elevation: 20,
               }}
             >
-              <MaterialIcons name="mic" size={44} color="#ffffff" />
+              <MaterialIcons name="mic" size={44} color={textPrimary} />
             </TouchableOpacity>
           </View>
 
@@ -219,9 +237,9 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
             {Array.from({ length: BAR_COUNT }).map((_, i) => {
               const anim = getBarAnim(i);
               const isMid = i > BAR_COUNT * 0.25 && i < BAR_COUNT * 0.75;
-              // Alternate colors for visual richness
+              // Alternating emerald shades for visual richness
               const color =
-                i % 3 === 0 ? "#818cf8" : i % 3 === 1 ? "#a78bfa" : "#c4b5fd";
+                i % 3 === 0 ? primaryLight : i % 3 === 1 ? accentMuted : accentLight;
               return (
                 <Animated.View
                   key={i}
@@ -251,7 +269,7 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
           {/* Duration */}
           <Text
             style={{
-              color: "#e0e7ff",
+              color: textSecondary,
               fontSize: 28,
               fontWeight: "300",
               letterSpacing: 4,
@@ -265,7 +283,7 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
           {/* "Tap mic to stop" hint */}
           <Animated.Text
             style={{
-              color: "#a5b4fc",
+              color: textMuted,
               fontSize: 13,
               fontWeight: "500",
               opacity: hintAnim,
@@ -283,22 +301,22 @@ export const VoiceRecordingModal: React.FC<VoiceRecordingModalProps> = ({
               gap: 8,
               paddingHorizontal: 16,
               paddingVertical: 10,
-              backgroundColor: "rgba(99,102,241,0.15)",
+              backgroundColor: tipBg,
               borderRadius: 12,
               borderWidth: 1,
-              borderColor: "rgba(99,102,241,0.3)",
+              borderColor: tipBorder,
             }}
           >
-            <MaterialIcons name="info-outline" size={15} color="#818cf8" />
+            <MaterialIcons name="tips-and-updates" size={15} color={primaryLight} />
             <Text
               style={{
-                color: "#a5b4fc",
+                color: textMuted,
                 fontSize: 12,
                 flex: 1,
                 lineHeight: 18,
               }}
             >
-              Auto-stops after silence · 15s max · Describe your event naturally
+              Describe your event naturally — we'll handle the rest
             </Text>
           </View>
         </Animated.View>
