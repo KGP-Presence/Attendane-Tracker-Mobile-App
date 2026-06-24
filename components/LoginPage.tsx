@@ -9,6 +9,7 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
+  Keyboard,
 } from "react-native";
 import { ChevronLeft, Eye, EyeOff, LogIn } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -30,6 +31,7 @@ export default function LoginScreen() {
   const scrollRef = useRef<ScrollView>(null);
 
   const handleSubmit = () => {
+    Keyboard.dismiss();
 
     if(Platform.OS === "android") {
       // Forces the motor to spin up and stop in exactly 20 milliseconds.
@@ -103,6 +105,12 @@ export default function LoginScreen() {
                 className="w-full h-14 bg-white dark:bg-slate-800 border border-[#dbdfe6] dark:border-slate-700 rounded-xl px-4 text-[#111318] dark:text-white focus:border-[#135bec]"
                 value={instituteId}
                 onChangeText={setInstituteId}
+                textContentType="username"
+                autoComplete="email"
+                importantForAutofill="yes"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                returnKeyType="next"
               />
             </View>
 
@@ -119,6 +127,11 @@ export default function LoginScreen() {
                   className="w-full h-14 bg-white dark:bg-slate-800 border border-[#dbdfe6] dark:border-slate-700 rounded-xl px-4 pr-12 text-[#111318] dark:text-white focus:border-[#135bec]"
                   value={password}
                   onChangeText={setPassword}
+                  textContentType="password"
+                  autoComplete="password"
+                  importantForAutofill="yes"
+                  returnKeyType="done"
+                  onSubmitEditing={handleSubmit}
                   onFocus={() => {
                     setTimeout(() => {
                       scrollRef.current?.scrollToEnd({ animated: true });

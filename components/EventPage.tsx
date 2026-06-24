@@ -31,10 +31,9 @@ import { useDeleteMultipleEvents, useEvents } from "../hooks/useEvents";
 import { AppEvent, EventType } from "../types/event";
 
 import CustomAlertModal from "./CustomAlertModal";
-import { CopilotOverlay } from "./CopilotOverlay";
 import { EventCreateModal } from "./EventCreateModal";
 import { VoiceRecordingModal } from "./VoiceRecordingModal";
-import { useCopilot } from "../hooks/useCopilot";
+import { EventCopilot } from "./copilot/EventCopilot";
 
 // Helper to format dates for section headers
 const formatDateGroup = (isoString: string) => {
@@ -93,43 +92,10 @@ export const EventsScreen = () => {
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const [showCreateSuccessAlert, setShowCreateSuccessAlert] = useState(false);
 
-  // First-time user copilot
-  const { isReady, shouldShow, markComplete } = useCopilot();
-  const isFocused = useIsFocused();
-
-  // Refs and state for Copilot spotlight measurements
+  // Refs for Copilot spotlight measurements
   const micButtonRef = useRef<View>(null);
   const addButtonRef = useRef<View>(null);
-  const [micCoords, setMicCoords] = useState<{ cx: number; cy: number; r: number } | null>(null);
-  const [addCoords, setAddCoords] = useState<{ cx: number; cy: number; r: number } | null>(null);
-
-  useEffect(() => {
-    if (isReady && shouldShow) {
-      const timer = setTimeout(() => {
-        micButtonRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
-          if (width > 0 && height > 0) {
-            setMicCoords({
-              cx: x + width / 2,
-              cy: y + height / 2,
-              r: Math.max(width, height) / 2 + 4,
-            });
-          }
-        });
-
-        addButtonRef.current?.measureInWindow((x: number, y: number, width: number, height: number) => {
-          if (width > 0 && height > 0) {
-            setAddCoords({
-              cx: x + width / 2,
-              cy: y + height / 2,
-              r: Math.max(width, height) / 2 + 4,
-            });
-          }
-        });
-      }, 600);
-
-      return () => clearTimeout(timer);
-    }
-  }, [isReady, shouldShow]);
+  const filterButtonRef = useRef<View>(null);
 
   // Audio Recording State
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
@@ -483,9 +449,9 @@ export const EventsScreen = () => {
                 onPress={handleBack}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <ChevronLeft size={28} color="#135bec" />
+                <ChevronLeft size={28} color="#135bec" onLayout={() => {}} />
               </TouchableOpacity>
-              <Text className="text-2xl font-bold text-slate-900 dark:text-white">
+              <Text className="text-[28px] font-extrabold text-slate-900 dark:text-white tracking-tight">
                 Events
               </Text>
             </View>
@@ -493,6 +459,8 @@ export const EventsScreen = () => {
               <User
                 size={24}
                 color="#135bec"
+                strokeWidth={2.5}
+                onLayout={() => {}}
                 onPress={() => {
                   if (Platform.OS === "android") Vibration.vibrate(20);
                   else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -523,6 +491,7 @@ export const EventsScreen = () => {
 
         <View className="flex-row items-center gap-3 mb-0">
           <TouchableOpacity
+            ref={filterButtonRef}
             onPress={() => hasEvents && setIsTypeMenuOpen(true)}
             disabled={!hasEvents}
             className={`flex-row items-center gap-2 px-4 py-2 rounded-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 shadow-sm ${!hasEvents ? "opacity-50" : ""}`}
@@ -715,15 +684,12 @@ export const EventsScreen = () => {
         onClose={() => setShowCreateSuccessAlert(false)}
       />
 
-      {/* First-time user copilot onboarding — only when Events tab is focused */}
-      {isReady && isFocused && (
-        <CopilotOverlay
-          visible={shouldShow}
-          onDone={markComplete}
-          micCoords={micCoords}
-          addCoords={addCoords}
-        />
-      )}
+      {/* First-time user copilot onboarding — logic extracted to wrapper */}
+      <EventCopilot
+        micButtonRef={micButtonRef}
+        addButtonRef={addButtonRef}
+        filterButtonRef={filterButtonRef}
+      />
 
       {/* Immersive voice recording popup */}
       <VoiceRecordingModal

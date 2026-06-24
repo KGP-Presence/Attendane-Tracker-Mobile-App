@@ -59,7 +59,7 @@ export const SubjectCard = ({
         {/* Circular Progress Ring */}
         <View className="items-center">
           <View className="relative items-center justify-center">
-            <Svg width="54" height="54" viewBox="0 0 54 54">
+            <Svg onLayout={() => {}} width="54" height="54" viewBox="0 0 54 54">
               <Circle cx="27" cy="27" r={radius} stroke="#F3F4F6" strokeWidth="5" fill="none" />
               <Circle
                 cx="27"

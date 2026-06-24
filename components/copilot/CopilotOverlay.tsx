@@ -10,88 +10,65 @@ import {
   TouchableOpacity,
   Vibration,
   View,
+  useColorScheme,
 } from "react-native";
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
-interface CopilotStep {
+export interface CopilotStep {
   title: string;
   description: string;
-  icon: keyof typeof MaterialIcons.glyphMap;
-  // Approximate position of the spotlight (center x, center y from top, radius)
-  spotlight?: { cx: number; cy: number; r: number };
+  icon?: keyof typeof MaterialIcons.glyphMap;
   // Which corner to anchor the tooltip card
   tooltipPosition?: "top" | "bottom" | "center";
 }
 
-const STEPS: CopilotStep[] = [
-  {
-    title: "Welcome to Events! 🎉",
-    description:
-      "This is your events hub. Keep track of exams, assignments, tests, and more — all in one place.",
-    icon: "event",
-    tooltipPosition: "center",
-  },
-  {
-    title: "Voice-Create Events 🎙️",
-    description:
-      'Tap the purple mic button and just speak — "Maths exam on Friday at 2 PM in LBS". Our AI will create the event for you instantly.',
-    icon: "mic",
-    spotlight: { cx: SCREEN_W - 48, cy: SCREEN_H - 230, r: 42 },
-    tooltipPosition: "top",
-  },
-  {
-    title: "Manual Create ✍️",
-    description:
-      "Prefer typing? Tap the blue + button to fill in event details yourself — name, location, type, date and time.",
-    icon: "add-circle-outline",
-    spotlight: { cx: SCREEN_W - 48, cy: SCREEN_H - 150, r: 42 },
-    tooltipPosition: "top",
-  },
-  {
-    title: "Filter by Type 🔍",
-    description:
-      "Use the Type filter to quickly see only Exams, Assignments, Tests or Others. Pull down to refresh.",
-    icon: "filter-list",
-    tooltipPosition: "bottom",
-  },
-  {
-    title: "Long-press to Multi-Select 🗑️",
-    description:
-      "Long-press any event card to enter multi-select mode. Then delete several events at once.",
-    icon: "select-all",
-    tooltipPosition: "center",
-  },
-];
-
 interface CopilotOverlayProps {
   visible: boolean;
   onDone: () => void;
-  micCoords?: { cx: number; cy: number; r: number } | null;
-  addCoords?: { cx: number; cy: number; r: number } | null;
+  steps: CopilotStep[];
+  spotlightMeasurements?: Record<number, { cx: number; cy: number; width: number; height: number; borderRadius: number } | null>;
 }
 
 export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
   visible,
   onDone,
-  micCoords,
-  addCoords,
+  steps,
+  spotlightMeasurements = {},
 }) => {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+
+  // Theme colors
+  const overlayBg = "rgba(0,0,0,0.78)";
+  const spotlightBorder = isDark ? "#3B82F6" : "#135bec";
+  const spotlightBg = isDark ? "rgba(19,91,236,0.18)" : "rgba(19,91,236,0.1)";
+  const cardBg = isDark ? "#101622" : "#ffffff";
+  const cardBorder = isDark ? "rgba(19,91,236,0.35)" : "rgba(19,91,236,0.15)";
+  const cardShadow = "#135bec";
+  const iconBadgeBg = isDark ? "rgba(19,91,236,0.2)" : "rgba(19,91,236,0.1)";
+  const iconColor = isDark ? "#60A5FA" : "#135bec";
+  const titleColor = isDark ? "#ffffff" : "#0f172a";
+  const descColor = isDark ? "#CBD5E1" : "#475569";
+  const activeDot = isDark ? "#3B82F6" : "#135bec";
+  const inactiveDot = isDark ? "#1E3A5F" : "#E2E8F0";
+  const skipText = isDark ? "#3B82F6" : "#135bec";
+  const nextBg = "#135bec";
+  const nextText = "#ffffff";
+
   const [step, setStep] = useState(0);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const cardSlide = useRef(new Animated.Value(40)).current;
   const spotlightAnim = useRef(new Animated.Value(0)).current;
   const glowLoop = useRef(new Animated.Value(0)).current;
 
-  const currentStep = STEPS[step];
+  const currentStep = steps[step];
 
-  // Resolve active spotlight (prefer dynamic measurements over hardcoded fallback coordinates)
+  // Resolve active spotlight from the mapped measurements
   const activeSpotlight = React.useMemo(() => {
-    if (step === 1 && micCoords) return micCoords;
-    if (step === 2 && addCoords) return addCoords;
-    return currentStep.spotlight;
-  }, [step, currentStep, micCoords, addCoords]);
-  const isLast = step === STEPS.length - 1;
+    return spotlightMeasurements[step] || null;
+  }, [step, spotlightMeasurements]);
+  const isLast = step === steps.length - 1;
 
   const haptic = () => {
     if (Platform.OS === "android") Vibration.vibrate(18);
@@ -178,14 +155,19 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
     }).start(() => onDone());
   };
 
-  const tooltipTop =
-    currentStep.tooltipPosition === "bottom"
-      ? SCREEN_H * 0.55
-      : currentStep.tooltipPosition === "center"
-        ? SCREEN_H * 0.3
-        : activeSpotlight
-          ? activeSpotlight.cy - activeSpotlight.r - 180
-          : SCREEN_H * 0.3;
+  // Compute dynamic styles for the tooltip card
+  const getTooltipStyle = () => {
+    if (currentStep.tooltipPosition === "bottom") {
+      const topPos = activeSpotlight ? activeSpotlight.cy + activeSpotlight.height / 2 + 16 : SCREEN_H * 0.55;
+      return { top: Math.min(topPos, SCREEN_H - 220) };
+    } else if (currentStep.tooltipPosition === "top") {
+      const bottomPos = activeSpotlight ? SCREEN_H - activeSpotlight.cy + activeSpotlight.height / 2 + 16 : SCREEN_H * 0.55;
+      return { bottom: Math.min(bottomPos, SCREEN_H - 220) };
+    } else {
+      // center
+      return { top: SCREEN_H * 0.3 };
+    }
+  };
 
   return (
     <Modal
@@ -198,53 +180,77 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
       <Animated.View
         style={{
           flex: 1,
-          backgroundColor: "rgba(0,0,0,0.78)",
           opacity: fadeAnim,
         }}
         pointerEvents="auto"
       >
-        {/* Spotlight ring */}
-        {activeSpotlight && (
-          <Animated.View
-            style={{
-              position: "absolute",
-              left: activeSpotlight.cx - activeSpotlight.r - 8,
-              top: activeSpotlight.cy - activeSpotlight.r - 8,
-              width: (activeSpotlight.r + 8) * 2,
-              height: (activeSpotlight.r + 8) * 2,
-              borderRadius: activeSpotlight.r + 8,
-              borderWidth: 2.5,
-              borderColor: "#3B82F6",
-              opacity: glowLoop.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0.6, 1],
-              }),
-              transform: [
-                {
-                  scale: glowLoop.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [1, 1.08],
-                  }),
-                },
-              ],
-            }}
-            pointerEvents="none"
-          />
-        )}
-        {activeSpotlight && (
+        {/* Exact Huge Border Spotlight Trick (No SVG needed) */}
+        {activeSpotlight ? (
+          (() => {
+            // Calculate exact maximum distance from center to any screen corner
+            const distTL = Math.hypot(activeSpotlight.cx, activeSpotlight.cy);
+            const distTR = Math.hypot(SCREEN_W - activeSpotlight.cx, activeSpotlight.cy);
+            const distBL = Math.hypot(activeSpotlight.cx, SCREEN_H - activeSpotlight.cy);
+            const distBR = Math.hypot(SCREEN_W - activeSpotlight.cx, SCREEN_H - activeSpotlight.cy);
+            // Minimum radius needed to cover the entire screen
+            const R_MAX = Math.ceil(Math.max(distTL, distTR, distBL, distBR));
+
+            return (
+              <View
+                style={{
+                  position: "absolute",
+                  left: activeSpotlight.cx - activeSpotlight.width / 2 - R_MAX,
+                  top: activeSpotlight.cy - activeSpotlight.height / 2 - R_MAX,
+                  width: activeSpotlight.width + R_MAX * 2,
+                  height: activeSpotlight.height + R_MAX * 2,
+                  borderRadius: R_MAX + activeSpotlight.borderRadius,
+                  borderWidth: R_MAX,
+                  borderColor: overlayBg,
+                  backgroundColor: "transparent",
+                }}
+                pointerEvents="auto"
+              />
+            );
+          })()
+        ) : (
           <View
             style={{
               position: "absolute",
-              left: activeSpotlight.cx - activeSpotlight.r,
-              top: activeSpotlight.cy - activeSpotlight.r,
-              width: activeSpotlight.r * 2,
-              height: activeSpotlight.r * 2,
-              borderRadius: activeSpotlight.r,
-              backgroundColor: "rgba(19,91,236,0.18)",
+              width: "100%",
+              height: "100%",
+              backgroundColor: overlayBg,
             }}
-            pointerEvents="none"
           />
         )}
+
+          {/* Spotlight animated ring */}
+          {activeSpotlight && (
+            <Animated.View
+              style={{
+                position: "absolute",
+                left: activeSpotlight.cx - activeSpotlight.width / 2 - 4,
+                top: activeSpotlight.cy - activeSpotlight.height / 2 - 4,
+                width: activeSpotlight.width + 8,
+                height: activeSpotlight.height + 8,
+                borderRadius: activeSpotlight.borderRadius + 4,
+                borderWidth: 2.5,
+                borderColor: spotlightBorder,
+                opacity: glowLoop.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.6, 1],
+                }),
+                transform: [
+                  {
+                    scale: glowLoop.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 1.05],
+                    }),
+                  },
+                ],
+              }}
+              pointerEvents="none"
+            />
+          )}
 
         {/* Tooltip card */}
         <Animated.View
@@ -252,47 +258,49 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
             position: "absolute",
             left: 24,
             right: 24,
-            top: Math.max(60, tooltipTop),
+            ...getTooltipStyle(),
             transform: [{ translateY: cardSlide }],
           }}
         >
           <View
             style={{
-              backgroundColor: "#101622",
+              backgroundColor: cardBg,
               borderRadius: 24,
               padding: 24,
-              shadowColor: "#135bec",
+              shadowColor: cardShadow,
               shadowOffset: { width: 0, height: 12 },
               shadowOpacity: 0.5,
               shadowRadius: 30,
               elevation: 25,
               borderWidth: 1,
-              borderColor: "rgba(19,91,236,0.35)",
+              borderColor: cardBorder,
             }}
           >
             {/* Icon badge */}
-            <View
-              style={{
-                width: 52,
-                height: 52,
-                borderRadius: 16,
-                backgroundColor: "rgba(19,91,236,0.2)",
-                alignItems: "center",
-                justifyContent: "center",
-                marginBottom: 16,
-              }}
-            >
-              <MaterialIcons
-                name={currentStep.icon}
-                size={28}
-                color="#60A5FA"
-              />
-            </View>
+            {currentStep.icon && (
+              <View
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 16,
+                  backgroundColor: iconBadgeBg,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: 16,
+                }}
+              >
+                <MaterialIcons
+                  name={currentStep.icon}
+                  size={28}
+                  color={iconColor}
+                />
+              </View>
+            )}
 
             {/* Title */}
             <Text
               style={{
-                color: "#ffffff",
+                color: titleColor,
                 fontSize: 20,
                 fontWeight: "700",
                 marginBottom: 10,
@@ -305,7 +313,7 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
             {/* Description */}
             <Text
               style={{
-                color: "#CBD5E1",
+                color: descColor,
                 fontSize: 14,
                 lineHeight: 22,
                 marginBottom: 24,
@@ -324,14 +332,14 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
             >
               {/* Dots */}
               <View style={{ flexDirection: "row", gap: 6 }}>
-                {STEPS.map((_, i) => (
+                {steps.map((_, i) => (
                   <View
                     key={i}
                     style={{
                       width: i === step ? 18 : 6,
                       height: 6,
                       borderRadius: 3,
-                      backgroundColor: i === step ? "#3B82F6" : "#1E3A5F",
+                      backgroundColor: i === step ? activeDot : inactiveDot,
                     }}
                   />
                 ))}
@@ -343,7 +351,7 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
                   <TouchableOpacity onPress={skip} activeOpacity={0.7}>
                     <Text
                       style={{
-                        color: "#3B82F6",
+                        color: skipText,
                         fontSize: 14,
                         fontWeight: "600",
                       }}
@@ -356,7 +364,7 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
                   onPress={goNext}
                   activeOpacity={0.85}
                   style={{
-                    backgroundColor: "#135bec",
+                    backgroundColor: nextBg,
                     paddingHorizontal: 22,
                     paddingVertical: 10,
                     borderRadius: 12,
@@ -367,7 +375,7 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
                 >
                   <Text
                     style={{
-                      color: "#ffffff",
+                      color: nextText,
                       fontSize: 14,
                       fontWeight: "700",
                     }}
@@ -378,7 +386,7 @@ export const CopilotOverlay: React.FC<CopilotOverlayProps> = ({
                     <MaterialIcons
                       name="arrow-forward"
                       size={16}
-                      color="#ffffff"
+                      color={nextText}
                     />
                   )}
                 </TouchableOpacity>
