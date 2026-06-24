@@ -7,25 +7,25 @@ import { CopilotOverlay, CopilotStep } from "./CopilotOverlay";
 const TIMETABLE_STEPS: CopilotStep[] = [
   {
     title: "Timetable Hub",
-    description: "Welcome to your Timetable! Here you can view, search, and manage all your scheduled classes.",
+    description: "Welcome to your Timetables! Here you can view, search, and manage all your timetables.",
     icon: "event-note",
     tooltipPosition: "center",
   },
   {
     title: "Quick Search",
-    description: "Looking for a specific class or subject? Type it here to find it instantly.",
+    description: "Looking for a specific timetable? Type it here to find it instantly.",
     icon: "search",
     tooltipPosition: "bottom",
   },
   {
-    title: "Filter by Day",
-    description: "Tap on any day of the week to jump straight to that day's schedule.",
-    icon: "calendar-today",
+    title: "Filter by Semester",
+    description: "Tap here to filter your timetables by semester.",
+    icon: "filter-list",
     tooltipPosition: "bottom",
   },
   {
-    title: "Create a Class",
-    description: "Need to add a new session? Tap the + button to manually schedule a class.",
+    title: "Create a Timetable",
+    description: "Need to add a new timetable? Tap the + button to create one.",
     icon: "add-circle",
     tooltipPosition: "top",
   },
