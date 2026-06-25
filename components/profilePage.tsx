@@ -91,6 +91,15 @@ export default function UserProfile() {
     }
     mutate();
   }
+
+  if (!data) {
+    return (
+      <SafeAreaView className="flex-1 bg-[#f6f6f8] dark:bg-[#101622] justify-center items-center">
+        <Text className="text-gray-500">Loading profile...</Text>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-[#f6f6f8] dark:bg-[#101622]">
       <StatusBar
@@ -222,7 +231,7 @@ export default function UserProfile() {
                     </Text>
                   </View>
                   <Text className="text-[#111318] dark:text-white text-base font-semibold">
-                    {data.department}
+                    {typeof data.department === "object" ? data.department?.shortCode : data.department}
                   </Text>
                 </View>
 

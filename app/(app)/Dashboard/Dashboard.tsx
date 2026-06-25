@@ -377,7 +377,7 @@ export default function Dashboard() {
                 Select Semester
               </Text>
               <View className="flex-row flex-wrap gap-2 justify-center">
-                {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((sem) => (
                   <TouchableOpacity
                     key={sem}
                     onPress={() => {

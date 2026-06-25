@@ -13,6 +13,7 @@ import axios, {
   AxiosInterceptorManager,
   InternalAxiosRequestConfig,
 } from "axios";
+import { router } from "expo-router";
 import { AppEvent, CreateEventPayload } from "../types/event";
 import { CreateSubjectPayload } from "../types/subjectTypes";
 
@@ -573,5 +574,12 @@ export const eventApi = {
       data: { ids },
     });
     return res.data;
+  },
+};
+
+export const departmentApi = {
+  getDepartments: async (api: AxiosInstance) => {
+    const response = await api.get("/departments");
+    return response.data.data;
   },
 };

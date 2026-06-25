@@ -7,6 +7,10 @@ import { Stack, router } from "expo-router";
 import { useEffect, useState } from "react";
 import { LogBox } from "react-native";
 import Toast from "react-native-toast-message";
+
+LogBox.ignoreLogs([
+  'Unsupported top level event type "topSvgLayout" dispatched',
+]);
 import "../global.css";
 import { setLogoutHandler } from "@/utils/api";
 

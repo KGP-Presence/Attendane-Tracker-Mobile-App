@@ -29,7 +29,7 @@ export default function AttendanceDetails() {
   const [selectedSem, setSelectedSem] = useState<number>(6);
   const [isSemModalVisible, setIsSemModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const availableSemesters = [1, 2, 3, 4, 5, 6, 7, 8];
+  const availableSemesters = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
   // Refs for DetailsCopilot
   const overviewRef = React.useRef<View>(null);
