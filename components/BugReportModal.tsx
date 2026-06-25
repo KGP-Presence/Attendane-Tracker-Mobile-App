@@ -10,6 +10,8 @@ import {
   Platform,
   Vibration,
   ScrollView,
+  Keyboard,
+  Animated,
 } from "react-native";
 import { X, Camera, Trash2 } from "lucide-react-native";
 import { useColorScheme } from "nativewind";
@@ -31,6 +33,22 @@ export default function BugReportModal({
 
   const [description, setDescription] = useState("");
   const [screenshotUri, setScreenshotUri] = useState<string | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  React.useEffect(() => {
+    const showSubscription = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSubscription = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => setKeyboardHeight(0)
+    );
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   const canSubmit = description.trim().length >= 10;
 
@@ -108,11 +126,14 @@ export default function BugReportModal({
       visible={visible}
       onRequestClose={handleClose}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        className="flex-1"
+      <View 
+        className="flex-1 bg-black/50 justify-end"
+        style={{ paddingBottom: Platform.OS === "android" ? keyboardHeight : 0 }}
       >
-        <View className="flex-1 bg-black/50 justify-end">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          className="justify-end"
+        >
           <View className="bg-white dark:bg-[#1a2230] rounded-t-3xl px-5 pt-4 pb-8 max-h-[90%]">
             {/* Header */}
             <View className="flex-row items-center justify-between mb-5 border-b border-gray-100 dark:border-gray-800 pb-3">
@@ -130,6 +151,7 @@ export default function BugReportModal({
             <ScrollView
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ flexGrow: 1, paddingBottom: 20 }}
             >
               {/* Description Input */}
               <Text className="text-[#616f89] dark:text-gray-400 text-sm font-medium mb-2">
@@ -199,8 +221,8 @@ export default function BugReportModal({
               </TouchableOpacity>
             </ScrollView>
           </View>
-        </View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
