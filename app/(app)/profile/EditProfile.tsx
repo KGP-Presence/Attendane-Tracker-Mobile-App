@@ -23,24 +23,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 
-const DEPARTMENTS = [
-  "CSE",
-  "ECE",
-  "ME",
-  "CE",
-  "EE",
-  "BT",
-  "MT",
-  "MI",
-  "CH",
-  "AE",
-  "PH",
-  "HS",
-  "MA",
-  "CY",
-  "NA",
-  "OT",
-];
+import { useDepartments } from "@/hooks/useDepartments";
 
 export default function EditProfileScreen() {
   const { colorScheme } = useColorScheme();
@@ -56,7 +39,8 @@ export default function EditProfileScreen() {
     lastName: "",
     rollNo: "",
     graduationYear: 2024,
-    department: "",
+    department: "", // stores the ObjectId or empty string
+    departmentCode: "", // stores the shortCode for display
   });
 
   useEffect(() => {
@@ -66,7 +50,8 @@ export default function EditProfileScreen() {
         lastName: meData.lastName || "",
         rollNo: meData.rollNo || "",
         graduationYear: meData.graduationYear || 2024,
-        department: meData.department || "",
+        department: typeof meData.department === "object" ? meData.department?._id : (meData.department || ""),
+        departmentCode: typeof meData.department === "object" ? meData.department?.shortCode : (meData.department || ""),
       });
     }
   }, [meData]);
@@ -87,18 +72,18 @@ export default function EditProfileScreen() {
     updateProfile(formData);
   };
 
-  const selectDepartment = (dept: string) => {
+  const selectDepartment = (deptId: string, deptCode: string) => {
     if (Platform.OS === "android") {
-      // Forces the motor to spin up and stop in exactly 20 milliseconds.
-      // This creates a sharp "tick" rather than a soft buzz.
       Vibration.vibrate(20);
     } else {
-      // iOS handles impacts much better natively, so stick to Expo here
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
-    handleUpdate("department", dept);
+    handleUpdate("department", deptId);
+    handleUpdate("departmentCode", deptCode);
     setIsDeptModalVisible(false);
   };
+
+  const { data: departmentsData } = useDepartments();
 
   if (isLoading) {
     return (
@@ -255,12 +240,12 @@ export default function EditProfileScreen() {
               >
                 <Text
                   className={
-                    formData.department
+                    formData.departmentCode
                       ? "text-slate-900 dark:text-slate-100 text-base"
                       : "text-slate-400 text-base"
                   }
                 >
-                  {formData.department ? formData.department : "Select Dept"}
+                  {formData.departmentCode ? formData.departmentCode : "Select Dept"}
                 </Text>
                 <MaterialIcons name="expand-more" size={24} color="#0fbd2c" />
               </TouchableOpacity>
@@ -310,26 +295,26 @@ export default function EditProfileScreen() {
             </View>
 
             <FlatList
-              data={DEPARTMENTS}
-              keyExtractor={(item) => item}
+              data={departmentsData || []}
+              keyExtractor={(item) => item._id}
               showsVerticalScrollIndicator={false}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   className={`p-4 border-b border-slate-100 dark:border-slate-800/50 flex-row justify-between items-center ${
-                    formData.department === item ? "bg-primary/5" : ""
+                    formData.department === item._id ? "bg-primary/5" : ""
                   }`}
-                  onPress={() => selectDepartment(item)}
+                  onPress={() => selectDepartment(item._id, item.shortCode)}
                 >
                   <Text
                     className={`text-base ${
-                      formData.department === item
+                      formData.department === item._id
                         ? "text-primary font-bold"
                         : "text-slate-700 dark:text-slate-300"
                     }`}
                   >
-                    {item}
+                    {item.shortCode} - {item.longName}
                   </Text>
-                  {formData.department === item && (
+                  {formData.department === item._id && (
                     <MaterialIcons name="check" size={20} color="#0fbd2c" />
                   )}
                 </TouchableOpacity>

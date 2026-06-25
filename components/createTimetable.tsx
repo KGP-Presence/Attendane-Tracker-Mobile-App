@@ -141,7 +141,19 @@ export default function CreateTimetable() {
                 placeholderTextColor="#616f89"
                 keyboardType="numeric"
                 value={semester}
-                onChangeText={setSemester}
+                onChangeText={(text) => {
+                  const cleaned = text.replace(/[^0-9]/g, "");
+                  if (cleaned === "") {
+                    setSemester("");
+                    return;
+                  }
+                  const num = parseInt(cleaned, 10);
+                  if (num >= 1 && num <= 10) {
+                    setSemester(num.toString());
+                  } else {
+                    Alert.alert("Invalid Semester", "Please enter a valid semester between 1 and 10.");
+                  }
+                }}
               />
             </View>
           </View>

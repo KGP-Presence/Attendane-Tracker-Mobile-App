@@ -9,7 +9,11 @@ export interface UserInterface {
   rollNo: string;
   graduationYear?: number;
   timetables: Types.ObjectId[]; // References to Timetable model
-  department: "CSE" | "ECE" | "ME" | "CE" | "EE" | "BT" | "MT" | "MI" | "CH" | "AE" | "PH" | "HS" | "MA" | "CY" | "NA" | "OT";
+  department: {
+    _id: string;
+    shortCode: string;
+    longName: string;
+  } | string;
   subjects: Types.ObjectId[];   // References to Subject model
   role: "normal" | "admin";
   refreshToken?: string;

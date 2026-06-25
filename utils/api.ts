@@ -13,6 +13,7 @@ import axios, {
   AxiosInterceptorManager,
   InternalAxiosRequestConfig,
 } from "axios";
+import { router } from "expo-router";
 import { AppEvent, CreateEventPayload } from "../types/event";
 import { CreateSubjectPayload } from "../types/subjectTypes";
 
@@ -137,13 +138,16 @@ export const createApiClient = (): AxiosInstance => {
           return api(originalRequest);
         } catch (refreshError: any) {
           // If the refresh token request itself fails (e.g. refresh token expired), we log the user out
-          console.error(
+          console.log(
             "[AXIOS] Refresh token is invalid/expired. Logging out...",
           );
           processQueue(refreshError, null);
 
           // Wiping local storage
           await removeToken();
+          
+          // Force fallback to login immediately
+          router.replace("/(auth)/login");
 
           return Promise.reject(refreshError);
         } finally {
@@ -572,5 +576,12 @@ export const eventApi = {
       data: { ids },
     });
     return res.data;
+  },
+};
+
+export const departmentApi = {
+  getDepartments: async (api: AxiosInstance) => {
+    const response = await api.get("/departments");
+    return response.data.data;
   },
 };

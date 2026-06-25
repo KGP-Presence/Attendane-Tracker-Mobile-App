@@ -5,7 +5,12 @@ import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { Stack } from "expo-router";
 import { useEffect, useState } from "react";
+import { LogBox } from "react-native";
 import Toast from "react-native-toast-message";
+
+LogBox.ignoreLogs([
+  'Unsupported top level event type "topSvgLayout" dispatched',
+]);
 import "../global.css";
 
 const queryClient = new QueryClient({
