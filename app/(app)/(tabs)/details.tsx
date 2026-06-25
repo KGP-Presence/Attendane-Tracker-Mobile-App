@@ -23,6 +23,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { User } from "lucide-react-native";
+import { DetailsCopilot } from "@/components/copilot/DetailsCopilot";
 
 export default function AttendanceDetails() {
   const [selectedSem, setSelectedSem] = useState<number>(6);
@@ -30,6 +31,12 @@ export default function AttendanceDetails() {
   const [refreshing, setRefreshing] = useState(false);
   const availableSemesters = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
+  // Refs for DetailsCopilot
+  const overviewRef = React.useRef<View>(null);
+  const semesterBtnRef = React.useRef<View>(null);
+  const subjectsRef = React.useRef<View>(null);
+  const timetablesRef = React.useRef<View>(null);
+  const scrollViewRef = React.useRef<ScrollView>(null);
   // New States for Search and Expand/Collapse
   const [subjectSearchQuery, setSubjectSearchQuery] = useState("");
   const [timetableSearchQuery, setTimetableSearchQuery] = useState("");
@@ -222,6 +229,7 @@ export default function AttendanceDetails() {
       </View>
 
       <ScrollView
+        ref={scrollViewRef}
         className="flex-1 pb-8"
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -240,26 +248,28 @@ export default function AttendanceDetails() {
               Semester Overview
             </Text>
 
-            <TouchableOpacity
-              className="flex-row items-center bg-emerald-50 dark:bg-emerald-900/30 px-4 py-2 rounded-full"
-              onPress={() => {
-                triggerHaptic();
-                setIsSemModalVisible(true)
-              }}
-            >
-              <Text className="text-emerald-600 dark:text-emerald-400 text-xs font-bold uppercase tracking-wider mr-1">
-                SEM {selectedSem}
-              </Text>
-              <MaterialIcons
-                name="expand-more"
-                size={16}
-                color={isDark ? "#34d399" : "#059669"}
-              />
-            </TouchableOpacity>
+            <View ref={semesterBtnRef} collapsable={false}>
+              <TouchableOpacity
+                className="flex-row items-center bg-emerald-50 dark:bg-emerald-900/30 px-4 py-2 rounded-full"
+                onPress={() => {
+                  triggerHaptic();
+                  setIsSemModalVisible(true);
+                }}
+              >
+                <Text className="text-emerald-600 dark:text-emerald-400 text-xs font-bold uppercase tracking-wider mr-1">
+                  SEM {selectedSem}
+                </Text>
+                <MaterialIcons
+                  name="expand-more"
+                  size={16}
+                  color={isDark ? "#34d399" : "#059669"}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Total Attendance Card */}
-          <View className="bg-emerald-500 dark:bg-emerald-600 p-6 rounded-2xl shadow-lg mb-8 items-center justify-center relative overflow-hidden">
+          <View ref={overviewRef} collapsable={false} className="bg-emerald-500 dark:bg-emerald-600 p-6 rounded-2xl shadow-lg mb-8 items-center justify-center relative overflow-hidden">
             <View className="absolute -right-10 -top-10 w-40 h-40 bg-white/20 rounded-full opacity-50" />
             <View className="absolute -left-10 -bottom-10 w-40 h-40 bg-black/10 rounded-full" />
 
@@ -360,7 +370,7 @@ export default function AttendanceDetails() {
         </View>
 
         {/* ALL SUBJECTS SECTION */}
-        <View className="px-5 pt-8 pb-6 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 mt-2">
+        <View ref={subjectsRef} className="px-5 pt-8 pb-6 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 mt-2">
           <View className="flex-row items-center justify-between mb-4">
             <View className="flex-row items-center">
               <Text className="text-2xl font-bold text-slate-900 dark:text-white mr-2">
@@ -522,7 +532,7 @@ export default function AttendanceDetails() {
         </View>
 
         {/* TIMETABLE SECTION */}
-        <View className="px-5 pt-8 pb-24 bg-white dark:bg-slate-900 mt-2">
+        <View ref={timetablesRef} className="px-5 pt-8 pb-24 bg-white dark:bg-slate-900 mt-2">
           <View className="flex-row items-center justify-between mb-4">
             <Text className="text-2xl font-bold text-slate-900 dark:text-white">
               Timetable
@@ -775,6 +785,14 @@ export default function AttendanceDetails() {
           </View>
         </Pressable>
       </Modal>
+
+      <DetailsCopilot
+        overviewRef={overviewRef}
+        semesterBtnRef={semesterBtnRef}
+        subjectsRef={subjectsRef}
+        timetablesRef={timetablesRef}
+        scrollViewRef={scrollViewRef}
+      />
 
     </SafeAreaView>
   );

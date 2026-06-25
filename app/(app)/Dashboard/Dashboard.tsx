@@ -20,8 +20,11 @@ import {
   useColorScheme,
   Vibration,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { DashboardCopilot } from "@/components/copilot/DashboardCopilot";
+import { TabBarCopilot } from "@/components/copilot/TabBarCopilot";
 
 // 1. Setup Icons for NativeWind
 const Icon = ({ name, size = 24, color, className }: any) => (
@@ -30,6 +33,27 @@ const Icon = ({ name, size = 24, color, className }: any) => (
 
 export default function Dashboard() {
   const { data } = useMe();
+
+  // Refs for Copilot spotlight
+  const profileRef = React.useRef<View>(null);
+  const helpRef = React.useRef<View>(null);
+  const scheduleRef = React.useRef<View>(null);
+  const attendanceBlockRef = React.useRef<View>(null);
+  const eventsBlockRef = React.useRef<View>(null);
+  const tab1Ref = React.useRef<View>(null);
+  const tab2Ref = React.useRef<View>(null);
+  const tab3Ref = React.useRef<View>(null);
+  const tab4Ref = React.useRef<View>(null);
+  const tab5Ref = React.useRef<View>(null);
+
+  const [showTabBarCopilot, setShowTabBarCopilot] = useState(false);
+
+  // Measure screen for ghost tab bar
+  const { width: screenWidth } = useWindowDimensions();
+  const TOTAL_BAR_WIDTH = Math.min(screenWidth - 32, 400);
+  const TAB_COUNT = 5;
+  const TAB_WIDTH_EXPANDED = 130;
+  const TAB_WIDTH_COLLAPSED = (TOTAL_BAR_WIDTH - TAB_WIDTH_EXPANDED - 20) / (TAB_COUNT - 1);
 
   // 1. Trigger the single Init call
   const {
@@ -190,8 +214,9 @@ export default function Dashboard() {
   // }
 
   return (
-    <SafeAreaView className="flex-1 bg-background-light dark:bg-background-dark">
-      <ScrollView
+    <View className="flex-1 bg-background-light dark:bg-background-dark">
+      <SafeAreaView className="flex-1">
+        <ScrollView
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: 80 }}
         showsVerticalScrollIndicator={false}
@@ -214,10 +239,11 @@ export default function Dashboard() {
             </Text>
           </View>
           <View className="flex-row gap-4">
-            <TouchableOpacity className="h-10 w-10 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/20">
+            <TouchableOpacity ref={helpRef} className="h-10 w-10 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/20">
               <Headphones
                 size={24}
                 color="#135bec"
+                onLayout={() => {}}
                 onPress={() => {
                   if (Platform.OS === "android") {
                     // Forces the motor to spin up and stop in exactly 20 milliseconds.
@@ -231,10 +257,12 @@ export default function Dashboard() {
                 }}
               />
             </TouchableOpacity>
-            <TouchableOpacity className="h-10 w-10 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/20">
+            <TouchableOpacity ref={profileRef} className="h-10 w-10 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/20">
               <User
                 size={24}
                 color="#135bec"
+                strokeWidth={2.5}
+                onLayout={() => {}}
                 onPress={() => {
                   if (Platform.OS === "android") {
                     // Forces the motor to spin up and stop in exactly 20 milliseconds.
@@ -252,7 +280,7 @@ export default function Dashboard() {
         </View>
 
       {/* Blue Schedule Card */}
-        <View className="bg-primary rounded-xl shadow-lg shadow-primary/20 overflow-hidden relative mb-6">
+        <View ref={scheduleRef} className="bg-primary rounded-xl shadow-lg shadow-primary/20 overflow-hidden relative mb-6">
           {/* Background Decorative Circles */}
           <View className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10" />
           <View className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full -ml-8 -mb-8" />
@@ -306,13 +334,15 @@ export default function Dashboard() {
           </View>
         </View>
         
-        {/* Semester Selector */}
-        <View className="flex-row items-center justify-between mb-4">
-          <Text className="text-lg font-bold text-slate-900 dark:text-white">
-            Attendance Stats
-          </Text>
-          <TouchableOpacity
-            onPress={() => setShowSemesterDropdown(true)}
+        {/* Attendance Block Wrapper for Copilot */}
+        <View ref={attendanceBlockRef}>
+          {/* Semester Selector */}
+          <View className="flex-row items-center justify-between mb-4">
+            <Text className="text-lg font-bold text-slate-900 dark:text-white">
+              Attendance Stats
+            </Text>
+            <TouchableOpacity
+              onPress={() => setShowSemesterDropdown(true)}
             className="flex-row items-center gap-1.5 bg-white dark:bg-[#151c2b] px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700"
           >
             <Icon
@@ -498,12 +528,16 @@ export default function Dashboard() {
             </View>
           </View>
         </View>
+        {/* End of Attendance Block Wrapper */}
+        </View>
 
         
 
-        {/* Horizontal Tabs */}
-        <ScrollView
-          horizontal
+        {/* Events Block Wrapper for Copilot */}
+        <View ref={eventsBlockRef}>
+          {/* Horizontal Tabs */}
+          <ScrollView
+            horizontal
           showsHorizontalScrollIndicator={false}
           className="flex-row pb-2 mb-4"
           contentContainerStyle={{ gap: 8 }}
@@ -528,11 +562,11 @@ export default function Dashboard() {
               isDark={isDark}
             />
           ))}
-        </ScrollView>
+          </ScrollView>
 
-        {/* Event List Items */}
-        <View className="gap-3 mt-2">
-          {filteredEvents.length > 0 ? (
+          {/* Event List Items */}
+          <View className="gap-3 mt-2">
+            {filteredEvents.length > 0 ? (
             filteredEvents.map((event) => {
               const eventDate = new Date(event.date);
               const day = String(eventDate.getDate()).padStart(2, "0");
@@ -553,13 +587,53 @@ export default function Dashboard() {
               );
             })
           ) : (
-            <Text className="text-slate-400 text-center py-4">
-              No events found.
-            </Text>
-          )}
+              <Text className="text-slate-400 text-center py-4">
+                No events found.
+              </Text>
+            )}
+          </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+
+      {/* Dashboard Copilot */}
+      <DashboardCopilot 
+        profileRef={profileRef}
+        helpRef={helpRef} 
+        scheduleRef={scheduleRef}
+        attendanceBlockRef={attendanceBlockRef}
+        eventsBlockRef={eventsBlockRef}
+        onDone={() => setShowTabBarCopilot(true)}
+      />
+
+      <TabBarCopilot 
+        tab1Ref={tab1Ref}
+        tab2Ref={tab2Ref}
+        tab3Ref={tab3Ref}
+        tab4Ref={tab4Ref}
+        tab5Ref={tab5Ref}
+        enabled={showTabBarCopilot}
+      />
+      
+      {/* Ghost Views matching the CustomTabBar dimensions/placement to get accurate measurements */}
+      <View 
+        pointerEvents="none" 
+        className="flex-row items-center justify-start px-2"
+        style={{ 
+          position: 'absolute', 
+          bottom: 25, 
+          alignSelf: 'center', 
+          height: 75, 
+          width: TOTAL_BAR_WIDTH,
+        }}
+      >
+        <View ref={tab1Ref} style={{ width: 130, height: 60 }} />
+        <View ref={tab2Ref} style={{ width: TAB_WIDTH_COLLAPSED, height: 60 }} />
+        <View ref={tab3Ref} style={{ width: TAB_WIDTH_COLLAPSED, height: 60 }} />
+        <View ref={tab4Ref} style={{ width: TAB_WIDTH_COLLAPSED, height: 60 }} />
+        <View ref={tab5Ref} style={{ width: TAB_WIDTH_COLLAPSED, height: 60 }} />
+      </View>
+    </View>
   );
 }
 

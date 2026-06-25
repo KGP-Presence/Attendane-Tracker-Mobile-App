@@ -42,6 +42,30 @@ const processQueue = (
   failedQueue = [];
 };
 
+// ─── Logout Callback ────────────────────────────────────────────────────────
+let _logoutHandler: (() => void) | null = null;
+
+export const setLogoutHandler = (handler: () => void) => {
+  _logoutHandler = handler;
+};
+
+// ─── Shared Logout Logic ────────────────────────────────────────────────────
+export const performLogout = async (reason = "session expired") => {
+  console.warn(`[AUTH] Logging out: ${reason}`);
+  isRefreshing = false;
+  failedQueue = [];
+  await removeToken();
+
+  if (_logoutHandler) {
+    _logoutHandler();
+  } else {
+    console.error(
+      "[AUTH] No logout handler registered. " +
+      "Call setLogoutHandler() in your app root to enable auto-redirect to login."
+    );
+  }
+};
+
 export const createApiClient = (): AxiosInstance => {
   const api = axios.create({
     baseURL: API_BASE_URL,
@@ -55,9 +79,7 @@ export const createApiClient = (): AxiosInstance => {
         config.headers.Authorization = `Bearer ${token}`;
       }
 
-      console.log(
-        `[AXIOS] Sending ${config.method?.toUpperCase()} request to: ${config.baseURL}${config.url}`,
-      );
+      console.log(`[AXIOS] ${config.method?.toUpperCase()} → ${config.url}`);
 
       return config;
     },
@@ -67,7 +89,6 @@ export const createApiClient = (): AxiosInstance => {
   // --- REFRESH TOKEN INTERCEPTOR LOGIC ---
   api.interceptors.response.use(
     (response) => {
-      // If the request succeeds fully (2xx status), just return the body
       return response;
     },
     async (error: AxiosError) => {
@@ -75,89 +96,66 @@ export const createApiClient = (): AxiosInstance => {
         _retry?: boolean;
       };
 
-      // Check if it's an authorization error (401), and ensure we aren't looping the refresh-token endpoint itself.
-      if (
+      // Only intercept 401 errors on non-refresh endpoints that haven't been retried yet.
+      const should401Intercept =
         error.response?.status === 401 &&
         originalRequest &&
         !originalRequest._retry &&
-        originalRequest.url !== "/users/refresh-token"
-      ) {
-        // Mark that we are attempting to retry this specific request
-        originalRequest._retry = true;
+        !originalRequest.url?.includes("refresh-accessToken");
 
-        if (isRefreshing) {
-          // If another request is currently refreshing the token, pause this request and add it to our queue
-          return new Promise(function (resolve, reject) {
-            failedQueue.push({ resolve, reject });
-          })
-            .then((token) => {
-              // Wait for the new token, attach it, and re-attempt the request
-              originalRequest.headers.Authorization = `Bearer ${token}`;
-              return api(originalRequest);
-            })
-            .catch((err) => {
-              return Promise.reject(err);
-            });
-        }
-
-        isRefreshing = true;
-
-        try {
-          const refreshToken = await getRefreshToken();
-
-          if (!refreshToken) {
-            // No refresh token available in storage, log the user out directly
-            throw new Error("No refresh token found.");
-          }
-
-          console.log("[AXIOS] Attempting to refresh the access token...");
-
-          // Request a new access token using our fresh refresh token using a base axios instance to avoid interception
-          const response = await axios.post(
-            `${API_BASE_URL}/users/refresh-accessToken`,
-            {
-              refreshToken: refreshToken,
-            },
-          );
-
-          // Assume the API structure handles standard backend response (if backend returns it inside .data.accessToken or similarly)
-          // Based on typical behavior, extract new token from response...
-          const { accessToken, refreshToken: newRefreshToken } =
-            response.data.data;
-
-          // Store the refreshed tokens securely
-          await saveToken(accessToken, newRefreshToken);
-
-          // Give the successful token to the queue to send any suspended requests immediately
-          processQueue(null, accessToken);
-
-          // Update the original failed request headers with the brand-new token
-          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-
-          // Finally, replay the original failed request!
-          return api(originalRequest);
-        } catch (refreshError: any) {
-          // If the refresh token request itself fails (e.g. refresh token expired), we log the user out
-          console.log(
-            "[AXIOS] Refresh token is invalid/expired. Logging out...",
-          );
-          processQueue(refreshError, null);
-
-          // Wiping local storage
-          await removeToken();
-          
-          // Force fallback to login immediately
-          router.replace("/(auth)/login");
-
-          return Promise.reject(refreshError);
-        } finally {
-          // Stop blocking concurrent requests since refresh is complete (whether failure or success)
-          isRefreshing = false;
-        }
+      if (!should401Intercept) {
+        return Promise.reject(error);
       }
 
-      // If error is not a 401, or if it's standard error, just pass it forward unchanged
-      return Promise.reject(error);
+      // Mark this specific request as retried so we don't loop.
+      originalRequest._retry = true;
+
+      // ── If a refresh is already in flight, queue this request ──────────
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return api(originalRequest);
+          })
+          .catch((err) => Promise.reject(err));
+      }
+
+      // ── Kick off a token refresh ────────────────────────────────────────
+      isRefreshing = true;
+
+      try {
+        const refreshToken = await getRefreshToken();
+
+        if (!refreshToken) {
+          throw new Error("No refresh token found in storage.");
+        }
+
+        console.log("[AUTH] Access token expired. Attempting silent refresh…");
+
+        // Use the base axios instance (bypasses this interceptor) so a 401
+        // on the refresh endpoint doesn't cause an infinite loop.
+        const response = await axios.post(
+          `${API_BASE_URL}/users/refresh-accessToken`,
+          { refreshToken }
+        );
+
+        const { accessToken, refreshToken: newRefreshToken } = response.data.data;
+
+        await saveToken(accessToken, newRefreshToken);
+        processQueue(null, accessToken);
+        console.log("[AUTH] Token refreshed. Replaying failed requests…");
+
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        return api(originalRequest);
+      } catch (refreshError: any) {
+        processQueue(refreshError, null);
+        await performLogout("refresh token expired or invalid");
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
     },
   );
 
