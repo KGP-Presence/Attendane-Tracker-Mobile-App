@@ -145,14 +145,7 @@ export default function EditProfileScreen() {
                 <MaterialIcons name="photo-camera" size={20} color="white" />
               </TouchableOpacity>
             </View>
-            <View className="items-center">
-              <Text className="text-slate-900 dark:text-slate-100 text-lg font-bold tracking-tight">
-                Update Photo
-              </Text>
-              <Text className="text-primary text-sm font-medium opacity-80 mt-1">
-                Max size 2MB
-              </Text>
-            </View>
+
           </View>
         </View>
 
