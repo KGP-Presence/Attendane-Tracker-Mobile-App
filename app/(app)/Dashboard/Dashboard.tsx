@@ -24,7 +24,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { TAB_BAR_BOTTOM_GAP, useTabBarClearance } from "@/components/TabItem";
+import { TAB_BAR_BOTTOM_GAP } from "@/components/TabItem";
 import { DashboardCopilot } from "@/components/copilot/DashboardCopilot";
 import { TabBarCopilot } from "@/components/copilot/TabBarCopilot";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -70,7 +70,6 @@ export default function Dashboard() {
   // Measure screen for ghost tab bar
   const { width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const tabBarClearance = useTabBarClearance();
   const TOTAL_BAR_WIDTH = Math.min(screenWidth - 32, 400);
   const TAB_COUNT = 5;
   const TAB_WIDTH_EXPANDED = 130;
@@ -252,7 +251,7 @@ export default function Dashboard() {
       <SafeAreaView className="flex-1">
         <ScrollView
         className="flex-1 px-5"
-        contentContainerStyle={{ paddingBottom: tabBarClearance }}
+        contentContainerStyle={{ paddingBottom: 80 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl

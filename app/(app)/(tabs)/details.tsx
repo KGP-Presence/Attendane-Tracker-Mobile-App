@@ -1,4 +1,3 @@
-import { useTabBarClearance } from "@/components/TabItem";
 import {
   useGetAttendanceStatBySemester,
   useGetAttendanceStatOfAllSubjects,
@@ -38,7 +37,6 @@ export default function AttendanceDetails() {
   const subjectsRef = React.useRef<View>(null);
   const timetablesRef = React.useRef<View>(null);
   const scrollViewRef = React.useRef<ScrollView>(null);
-  const tabBarClearance = useTabBarClearance();
   // New States for Search and Expand/Collapse
   const [subjectSearchQuery, setSubjectSearchQuery] = useState("");
   const [timetableSearchQuery, setTimetableSearchQuery] = useState("");
@@ -232,8 +230,7 @@ export default function AttendanceDetails() {
 
       <ScrollView
         ref={scrollViewRef}
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: tabBarClearance }}
+        className="flex-1 pb-8"
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl

@@ -23,13 +23,11 @@ import { useColorScheme } from "nativewind";
 import ErrorScreen from "@/components/ErrorPage";
 import * as Haptics from "expo-haptics";
 import { TimetableCopilot } from "@/components/copilot/TimetableCopilot";
-import { useTabBarClearance } from "@/components/TabItem";
 
 export default function TimetableScreen() {
   // Destructure refetch from your custom hook
   const { data, isLoading, isError, refetch } = useGetUserTimetables();
   const { colorScheme } = useColorScheme();
-  const tabBarClearance = useTabBarClearance();
   const [searchQuery, setSearchQuery] = useState("");
   
   // State for semester filtering
@@ -153,7 +151,7 @@ export default function TimetableScreen() {
       {/* Main Scrollable Content */}
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ padding: 16, paddingBottom: tabBarClearance }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 150 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -183,14 +181,13 @@ export default function TimetableScreen() {
       <TouchableOpacity
         ref={addRef}
         style={{
-          bottom: tabBarClearance,
           elevation: 8,
           shadowColor: "#000",
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.3,
           shadowRadius: 4.65,
         }}
-        className="absolute right-6 h-16 w-16 items-center justify-center rounded-full bg-blue-600 z-50"
+        className="absolute bottom-32 right-6 h-16 w-16 items-center justify-center rounded-full bg-blue-600 z-50"
         onPress={() =>{
           if(Platform.OS === "android") {
             // Forces the motor to spin up and stop in exactly 20 milliseconds.

@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useTabBarClearance } from "@/components/TabItem";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -39,7 +38,6 @@ interface FilterOptions {
 type FilterCategory = keyof FilterOptions;
 
 export default function SubjectsPage() {
-  const tabBarClearance = useTabBarClearance();
   // --- Dark Mode Setup ---
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -898,7 +896,7 @@ export default function SubjectsPage() {
           data={filteredSubjects}
           keyExtractor={(item) => item._id || Math.random().toString()}
           renderItem={renderSubjectCard}
-          contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: tabBarClearance }}
+          contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
