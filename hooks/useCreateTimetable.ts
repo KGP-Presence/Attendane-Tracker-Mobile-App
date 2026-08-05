@@ -63,9 +63,19 @@ export const useCreateTimetableByImage = () => {
       queryClient.invalidateQueries({
         queryKey: ["userTimetables"],
       });
+      // parsedData is [{ code, venues }]. Codes stay a plain comma list so the
+      // existing batch navigation keeps working; venues ride along as a
+      // separate code -> venues map since route params must be strings.
+      const scanned: { code: string; venues: string[] }[] = data?.parsedData || [];
       router.replace({
         pathname: "/(app)/subject/create",
-        params: { batchCodes: data?.parsedData?.join(','), timetableId: data?.timetable?._id }
+        params: {
+          batchCodes: scanned.map((s) => s.code).join(','),
+          batchVenues: JSON.stringify(
+            Object.fromEntries(scanned.map((s) => [s.code, s.venues])),
+          ),
+          timetableId: data?.timetable?._id,
+        }
       })
     },
     onError: (error) => {
