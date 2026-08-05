@@ -72,12 +72,13 @@ export default function LoginScreen() {
             </Text>
           </View>
 
-          {/* Logo Placeholder */}
+          {/* Logo */}
           <View className="items-center pt-8">
-            <View className="w-32 h-32 rounded-full bg-slate-200 overflow-hidden items-center justify-center">
+            <View className="w-32 h-32 rounded-full bg-white overflow-hidden items-center justify-center">
               <Image
-                source={{ uri: "https://via.placeholder.com/128" }}
+                source={require("@/assets/icons/adaptive-icon.png")}
                 className="w-full h-full"
+                resizeMode="contain"
               />
             </View>
           </View>
