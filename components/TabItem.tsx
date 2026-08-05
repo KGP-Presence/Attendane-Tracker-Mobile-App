@@ -17,6 +17,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 // Gap between the floating bar and whatever sits below it (system nav bar or
 // screen edge). Exported so the Dashboard's copilot ghost views stay aligned.
 export const TAB_BAR_BOTTOM_GAP = 25;
+const TAB_BAR_HEIGHT = 75;
+
+/**
+ * Bottom padding a scrolling tab screen needs so the floating bar never covers
+ * its last row. Every tab screen derives its padding from this, so changing the
+ * bar's geometry does not silently hide content on four other screens.
+ */
+export const useTabBarClearance = () => {
+  const { bottom } = useSafeAreaInsets();
+  return TAB_BAR_BOTTOM_GAP + TAB_BAR_HEIGHT + bottom + 16;
+};
 
 // --- Types ---
 type IconName = keyof typeof FontAwesome.glyphMap;
@@ -150,8 +161,9 @@ export const CustomTabBar = ({
 
   return (
     <View
-      className="flex-row absolute self-center h-[75px] rounded-[40px] items-center justify-start px-2"
+      className="flex-row absolute self-center rounded-[40px] items-center justify-start px-2"
       style={{
+        height: TAB_BAR_HEIGHT,
         bottom: TAB_BAR_BOTTOM_GAP + insets.bottom,
         backgroundColor: colors.barBg,
         width: TOTAL_BAR_WIDTH,

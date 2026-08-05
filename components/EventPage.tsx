@@ -1,4 +1,5 @@
 import { MaterialIcons } from "@expo/vector-icons";
+import { useTabBarClearance } from "@/components/TabItem";
 import { router } from "expo-router";
 import React, { useCallback, useMemo, useState, useRef, useEffect } from "react";
 import {
@@ -64,6 +65,7 @@ const SILENCE_TIMEOUT = 2000; // 2 seconds of continuous silence to trigger auto
 const SILENCE_THRESHOLD = -35; // Decibel (dB) threshold for silence
 
 export const EventsScreen = () => {
+  const tabBarClearance = useTabBarClearance();
   const { data: events, isLoading, isError, refetch } = useEvents();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -537,7 +539,7 @@ export const EventsScreen = () => {
           refreshing={refreshing}
           contentContainerStyle={{
             paddingHorizontal: 20,
-            paddingBottom: 100,
+            paddingBottom: tabBarClearance,
             paddingTop: 8,
           }}
           ListEmptyComponent={<EmptyState />}
