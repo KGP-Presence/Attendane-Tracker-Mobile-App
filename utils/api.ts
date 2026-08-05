@@ -495,6 +495,23 @@ export const dashboardApi = {
     const res = await api.get("/dashboard/upcoming/classes");
     return res.data.data;
   },
+
+  getUpcomingClassesBySemester: async (
+    api: AxiosInstance,
+    semester: number,
+  ) => {
+    try {
+      const res = await api.get(
+        `/dashboard/upcoming/classes/semester/${semester}`,
+      );
+      return res.data.data;
+    } catch (error: any) {
+      if (error?.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  },
 };
 
 export const detailsApi = {

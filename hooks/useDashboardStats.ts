@@ -38,6 +38,16 @@ export const useGetAttendanceStatsBySemester = (semester: number) => {
   });
 };
 
+export const useGetUpcomingClassesBySemester = (semester: number) => {
+  return useQuery({
+    queryKey: ["upcomingClasses", "semester", semester],
+    queryFn: async () => {
+      return dashboardApi.getUpcomingClassesBySemester(api, semester);
+    },
+    enabled: !!semester,
+  });
+};
+
 // export const useGetUpcomingClasses = () => {
 //   return useQuery({
 //     queryKey: ["userUpcomingClasses"],

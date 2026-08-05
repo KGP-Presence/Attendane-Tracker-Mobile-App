@@ -1,6 +1,7 @@
 import {
   useGetAttendanceStatsBySemester,
-  useGetDashboardInit
+  useGetDashboardInit,
+  useGetUpcomingClassesBySemester
 } from "@/hooks/useDashboardStats";
 import { useMe } from "@/hooks/useMe";
 import { scheduleClassReminders } from "@/utils/notificationHelper";
@@ -81,7 +82,7 @@ export default function Dashboard() {
     refetch: refetchDashboard,
   } = useGetDashboardInit();
 
-  const upcomingClasses = dashboardData?.upcomingClasses || [];
+  const initUpcomingClasses = dashboardData?.upcomingClasses || [];
   const allEvents = dashboardData?.events || [];
   
   const defaultStats = useMemo(() => ({
@@ -116,12 +117,25 @@ export default function Dashboard() {
       ? (semesterStats ?? { topAttended: [], leastAttended: [] })
       : { topAttended: [], leastAttended: [] };
 
-  // Schedule notifications for upcoming classes
+  // Schedule at a Glance follows the same semester as the stats above, so a new
+  // semester never shows last semester's classes.
+  const { data: semesterClasses, isFetched: isSemesterClassesFetched } =
+    useGetUpcomingClassesBySemester(selectedSemester);
+
+  const upcomingClasses = isDefaultSemester
+    ? initUpcomingClasses
+    : isSemesterClassesFetched
+      ? (semesterClasses ?? [])
+      : [];
+
+  // Schedule notifications for upcoming classes. Deliberately keyed off the
+  // current semester, not the browsed one, so previewing an old semester never
+  // schedules reminders for classes the user no longer attends.
   useEffect(() => {
-    if (upcomingClasses && upcomingClasses.length > 0) {
-      scheduleClassReminders(upcomingClasses);
+    if (initUpcomingClasses && initUpcomingClasses.length > 0) {
+      scheduleClassReminders(initUpcomingClasses);
     }
-  }, [upcomingClasses]);
+  }, [initUpcomingClasses]);
 
   // --- New State for Schedule and Refresh ---
   const [isExpanded, setIsExpanded] = useState(false);
@@ -311,6 +325,15 @@ export default function Dashboard() {
                 <Text className="text-lg font-semibold text-white">
                   Schedule at a Glance
                 </Text>
+                {/* Makes it visible that this card is scoped to the selected
+                    semester, whose picker sits further down the page */}
+                {!!selectedSemester && (
+                  <View className="bg-white/20 px-2 py-0.5 rounded-md">
+                    <Text className="text-[10px] font-bold text-white">
+                      SEM {selectedSemester}
+                    </Text>
+                  </View>
+                )}
               </View>
               {/* Only show the button if there are more than 2 classes */}
               {hasMoreThanTwo && (
