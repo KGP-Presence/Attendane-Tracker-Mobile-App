@@ -20,6 +20,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 
+const SEMESTERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
 export default function CreateTimetable() {
   const [name, setName] = useState("");
   const [semester, setSemester] = useState("");
@@ -135,26 +137,38 @@ export default function CreateTimetable() {
               <Text className="text-[#111318] dark:text-white/90 text-xs font-bold uppercase tracking-widest mb-2">
                 Semester
               </Text>
-              <TextInput
-                className="w-full rounded-xl border border-[#dbdfe6] dark:border-white/10 bg-white dark:bg-[#1c2433] h-14 px-4 text-base text-[#111318] dark:text-white"
-                placeholder="Semester number"
-                placeholderTextColor="#616f89"
-                keyboardType="numeric"
-                value={semester}
-                onChangeText={(text) => {
-                  const cleaned = text.replace(/[^0-9]/g, "");
-                  if (cleaned === "") {
-                    setSemester("");
-                    return;
-                  }
-                  const num = parseInt(cleaned, 10);
-                  if (num >= 1 && num <= 10) {
-                    setSemester(num.toString());
-                  } else {
-                    Alert.alert("Invalid Semester", "Please enter a valid semester between 1 and 10.");
-                  }
-                }}
-              />
+              <View className="flex-row flex-wrap gap-2">
+                {SEMESTERS.map((sem) => {
+                  const isSelected = semester === sem.toString();
+                  return (
+                    <TouchableOpacity
+                      key={sem}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        if (Platform.OS === "android") {
+                          Vibration.vibrate(20);
+                        } else {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        }
+                        setSemester(sem.toString());
+                      }}
+                      className={`w-14 h-14 rounded-xl border items-center justify-center ${
+                        isSelected
+                          ? "bg-[#135bec] border-[#135bec]"
+                          : "bg-white dark:bg-[#1c2433] border-[#dbdfe6] dark:border-white/10"
+                      }`}
+                    >
+                      <Text
+                        className={`text-base font-bold ${
+                          isSelected ? "text-white" : "text-[#111318] dark:text-white"
+                        }`}
+                      >
+                        {sem}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
           </View>
 
