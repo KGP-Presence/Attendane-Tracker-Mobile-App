@@ -25,6 +25,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { DashboardCopilot } from "@/components/copilot/DashboardCopilot";
 import { TabBarCopilot } from "@/components/copilot/TabBarCopilot";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // 1. Setup Icons for NativeWind
 const Icon = ({ name, size = 24, color, className }: any) => (
@@ -47,6 +48,22 @@ export default function Dashboard() {
   const tab5Ref = React.useRef<View>(null);
 
   const [showTabBarCopilot, setShowTabBarCopilot] = useState(false);
+
+  // Auto-restore tab bar copilot if dashboard copilot was completed but tab bar copilot was not
+  useEffect(() => {
+    const checkCopilotStatus = async () => {
+      try {
+        const dashboardDone = await AsyncStorage.getItem("@kgp_presence_dashboard_copilot_done");
+        const tabbarDone = await AsyncStorage.getItem("@kgp_presence_tabbar_copilot_done");
+        if (dashboardDone === "done" && tabbarDone !== "done") {
+          setShowTabBarCopilot(true);
+        }
+      } catch (e) {
+        console.error("Failed to read copilot status on mount:", e);
+      }
+    };
+    checkCopilotStatus();
+  }, []);
 
   // Measure screen for ghost tab bar
   const { width: screenWidth } = useWindowDimensions();
