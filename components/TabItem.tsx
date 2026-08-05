@@ -12,6 +12,11 @@ import { FontAwesome } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Vibration, Platform } from "react-native";
 import { MaterialTopTabBarProps } from "@react-navigation/material-top-tabs";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+// Gap between the floating bar and whatever sits below it (system nav bar or
+// screen edge). Exported so the Dashboard's copilot ghost views stay aligned.
+export const TAB_BAR_BOTTOM_GAP = 25;
 
 // --- Types ---
 type IconName = keyof typeof FontAwesome.glyphMap;
@@ -120,6 +125,10 @@ export const CustomTabBar = ({
   // 1. Get Screen Width
   const { width: screenWidth } = useWindowDimensions();
 
+  // Lift the bar above the system navigation bar. On gesture-nav devices this
+  // inset is ~0, so the original placement is preserved.
+  const insets = useSafeAreaInsets();
+
   // 2. Dynamic Calculations
   const TAB_COUNT = state.routes.length;
   const TOTAL_BAR_WIDTH = Math.min(screenWidth - 32, 400);
@@ -141,8 +150,9 @@ export const CustomTabBar = ({
 
   return (
     <View
-      className="flex-row absolute bottom-[25px] self-center h-[75px] rounded-[40px] items-center justify-start px-2"
+      className="flex-row absolute self-center h-[75px] rounded-[40px] items-center justify-start px-2"
       style={{
+        bottom: TAB_BAR_BOTTOM_GAP + insets.bottom,
         backgroundColor: colors.barBg,
         width: TOTAL_BAR_WIDTH,
         shadowColor: "#000",
