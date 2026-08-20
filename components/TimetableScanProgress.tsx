@@ -118,7 +118,7 @@ type Props = {
   data?: TimetableScanResponse;
   errorMessage?: string;
   onViewTimetable: (timetableId: string) => void;
-  onCreateManually: (codes: string[], timetableId: string) => void;
+  onCreateManually: (skipped: ScanResult[], timetableId: string) => void;
   onDismiss: () => void;
 };
 
@@ -321,12 +321,7 @@ export const TimetableScanProgress = ({
             <>
               {finished && skipped.length > 0 && (
                 <TouchableOpacity
-                  onPress={() =>
-                    onCreateManually(
-                      skipped.map((result) => result.code),
-                      timetableId,
-                    )
-                  }
+                  onPress={() => onCreateManually(skipped, timetableId)}
                   className="h-14 rounded-xl items-center justify-center bg-[#135bec]"
                 >
                   <Text className="text-white font-bold text-base">

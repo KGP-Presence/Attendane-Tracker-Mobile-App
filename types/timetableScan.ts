@@ -14,6 +14,8 @@ export type ScanResult = {
   name: string;
   status: ScanStatus;
   slots: string[];
+  /** Rooms read off the uploaded image for this subject. */
+  venues: string[];
   subjectId?: string;
   reason?: ScanSkipReason;
   detail?: string;

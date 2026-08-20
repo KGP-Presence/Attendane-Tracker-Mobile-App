@@ -26,6 +26,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 
+const SEMESTERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
 export default function CreateTimetable() {
   const [name, setName] = useState("");
   const [semester, setSemester] = useState("");
@@ -126,11 +128,22 @@ export default function CreateTimetable() {
           setScanPhase("idle");
           router.replace({ pathname: "/timetable/[id]", params: { id: timetableId } });
         }}
-        onCreateManually={(codes, timetableId) => {
+        onCreateManually={(skipped, timetableId) => {
           setScanPhase("idle");
+          // Codes stay a plain comma list for the batch form; the venues we
+          // read off the image ride along as a code -> venues map, since
+          // route params have to be strings.
           router.replace({
             pathname: "/(app)/subject/create",
-            params: { batchCodes: codes.join(","), timetableId },
+            params: {
+              batchCodes: skipped.map((result) => result.code).join(","),
+              batchVenues: JSON.stringify(
+                Object.fromEntries(
+                  skipped.map((result) => [result.code, result.venues ?? []]),
+                ),
+              ),
+              timetableId,
+            },
           });
         }}
       />
@@ -178,26 +191,39 @@ export default function CreateTimetable() {
               <Text className="text-[#111318] dark:text-white/90 text-xs font-bold uppercase tracking-widest mb-2">
                 Semester
               </Text>
-              <TextInput
-                className="w-full rounded-xl border border-[#dbdfe6] dark:border-white/10 bg-white dark:bg-[#1c2433] h-14 px-4 text-base text-[#111318] dark:text-white"
-                placeholder="Semester number"
-                placeholderTextColor="#616f89"
-                keyboardType="numeric"
-                value={semester}
-                onChangeText={(text) => {
-                  const cleaned = text.replace(/[^0-9]/g, "");
-                  if (cleaned === "") {
-                    setSemester("");
-                    return;
-                  }
-                  const num = parseInt(cleaned, 10);
-                  if (num >= 1 && num <= 10) {
-                    setSemester(num.toString());
-                  } else {
-                    Alert.alert("Invalid Semester", "Please enter a valid semester between 1 and 10.");
-                  }
-                }}
-              />
+              <View className="flex-row flex-wrap justify-between gap-y-3">
+                {SEMESTERS.map((sem) => {
+                  const isSelected = semester === sem.toString();
+                  return (
+                    <TouchableOpacity
+                      key={sem}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        if (Platform.OS === "android") {
+                          Vibration.vibrate(20);
+                        } else {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        }
+                        setSemester(sem.toString());
+                      }}
+                      style={{ width: `${100 / 5 - 2}%` }}
+                      className={`h-14 rounded-xl border items-center justify-center ${
+                        isSelected
+                          ? "bg-[#135bec] border-[#135bec]"
+                          : "bg-white dark:bg-[#1c2433] border-[#dbdfe6] dark:border-white/10"
+                      }`}
+                    >
+                      <Text
+                        className={`text-base font-bold ${
+                          isSelected ? "text-white" : "text-[#111318] dark:text-white"
+                        }`}
+                      >
+                        {sem}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
           </View>
 

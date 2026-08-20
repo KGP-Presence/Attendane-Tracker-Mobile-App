@@ -194,21 +194,6 @@ export default function KGPPresence(): React.JSX.Element {
           </Text>
         </View>
 
-        {/* Team Section */}
-        <View className="px-4 pb-6">
-          <View className="flex-row items-center gap-2 mb-4">
-            <Users size={20} color="#0fbd2c" />
-            <Text className="text-xl font-bold text-slate-900 dark:text-white">
-              Meet the Team
-            </Text>
-          </View>
-
-          {/* Map over the shuffled array instead of TEAM_DATA */}
-          {shuffledTeam.map((member) => (
-            <TeamMemberCard key={member.id} {...member} />
-          ))}
-        </View>
-
         {/* Contact Section */}
         <View className="px-4">
           <View className="bg-primary/5 rounded-2xl p-6 border border-primary/10 mb-8">
@@ -283,6 +268,22 @@ export default function KGPPresence(): React.JSX.Element {
           <Text className="text-slate-400 text-xs text-center mt-3">
             Your feedback helps us improve KGP Presence
           </Text>
+        </View>
+
+        {/* Team Section — placed after the support options, since people open
+            this page to get help first and meet the makers second */}
+        <View className="px-4 pt-4 pb-6">
+          <View className="flex-row items-center gap-2 mb-4">
+            <Users size={20} color="#0fbd2c" />
+            <Text className="text-xl font-bold text-slate-900 dark:text-white">
+              Meet the Team
+            </Text>
+          </View>
+
+          {/* Map over the shuffled array instead of TEAM_DATA */}
+          {shuffledTeam.map((member) => (
+            <TeamMemberCard key={member.id} {...member} />
+          ))}
         </View>
 
         {/* Modals */}

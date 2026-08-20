@@ -18,8 +18,17 @@ export const useRegister = () => {
         onSuccess: async (data) => {
             try {
                 await AsyncStorage.setItem("@kgp_presence_just_registered", "true");
+                const keys = [
+                    "@kgp_presence_dashboard_copilot_done",
+                    "@kgp_presence_timetable_copilot_done",
+                    "@kgp_presence_subject_copilot_done",
+                    "@kgp_presence_event_copilot_done",
+                    "@kgp_presence_details_copilot_done",
+                    "@kgp_presence_tabbar_copilot_done"
+                ];
+                await Promise.all(keys.map(key => AsyncStorage.removeItem(key)));
             } catch (e) {
-                console.error("Failed to set register flag:", e);
+                console.error("Failed to set register flag or clear copilot keys:", e);
             }
             Toast.show({
                 type: "success",

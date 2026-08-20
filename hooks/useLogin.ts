@@ -27,18 +27,19 @@ export const useLogin = () => {
 
       try {
         const justRegistered = await AsyncStorage.getItem("@kgp_presence_just_registered");
+        const keys = [
+          "@kgp_presence_dashboard_copilot_done",
+          "@kgp_presence_timetable_copilot_done",
+          "@kgp_presence_subject_copilot_done",
+          "@kgp_presence_event_copilot_done",
+          "@kgp_presence_details_copilot_done",
+          "@kgp_presence_tabbar_copilot_done"
+        ];
         if (justRegistered === "true") {
           await AsyncStorage.removeItem("@kgp_presence_just_registered");
+          await Promise.all(keys.map(key => AsyncStorage.removeItem(key)));
         } else {
           // If they just logged in without registering on this device, skip copilots
-          const keys = [
-            "@kgp_presence_dashboard_copilot_done",
-            "@kgp_presence_timetable_copilot_done",
-            "@kgp_presence_subject_copilot_done",
-            "@kgp_presence_event_copilot_done",
-            "@kgp_presence_details_copilot_done",
-            "@kgp_presence_tabbar_copilot_done"
-          ];
           await Promise.all(keys.map(key => AsyncStorage.setItem(key, "done")));
         }
       } catch (e) {

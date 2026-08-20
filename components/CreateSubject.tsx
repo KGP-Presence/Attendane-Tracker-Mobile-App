@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -51,11 +51,22 @@ export default function CreateSubjectPage() {
   const isDark = colorScheme === "dark";
 
   // --- BATCH & TIMETABLE LOGIC ---
-  const { batchCodes, timetableId } = useLocalSearchParams<{
+  const { batchCodes, batchVenues, timetableId } = useLocalSearchParams<{
     batchCodes?: string;
+    batchVenues?: string;
     timetableId?: string;
   }>();
   const codesArray = batchCodes ? batchCodes.split(",") : [];
+
+  // Venues read off the uploaded timetable image, keyed by subject code.
+  const scannedVenuesByCode = useMemo<Record<string, string[]>>(() => {
+    if (!batchVenues) return {};
+    try {
+      return JSON.parse(batchVenues);
+    } catch {
+      return {};
+    }
+  }, [batchVenues]);
   const isBatchMode = codesArray.length > 0;
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -128,10 +139,7 @@ export default function CreateSubjectPage() {
         : [];
       setProfessors(parsedProfessors);
 
-      const parsedVenues: string[] = fetchedSubject.venue
-        ? fetchedSubject.venue.split(",").map((v: string) => v.trim())
-        : [];
-      setVenues([...new Set(parsedVenues)]);
+      setVenues(scannedVenuesByCode[subjectCode] ?? []);
 
       if (fetchedSubject.slots) {
         const slots = (fetchedSubject.slots as string)
@@ -163,12 +171,13 @@ export default function CreateSubjectPage() {
       setSubjectName("");
       setCredits(3);
       setProfessors([]);
-      setVenues([]);
+      // A code missing from SubjectsData still has a room on the user's image
+      setVenues(scannedVenuesByCode[subjectCode] ?? []);
       setSelectedSlots([]);
       setGrading("UNKNOWN");
       setType("OTHER");
     }
-  }, [fetchedSubject, subjectCode]);
+  }, [fetchedSubject, subjectCode, scannedVenuesByCode]);
 
   const toggleSlot = (slotKey: string) => {
     if (Platform.OS === "android") Vibration.vibrate(20);
