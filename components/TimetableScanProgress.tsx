@@ -4,45 +4,394 @@ import {
   TimetableScanResponse,
 } from "@/types/timetableScan";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useRef, useState } from "react";
+import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
+import { cssInterop } from "nativewind";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Animated,
-  Easing,
   Modal,
+  Platform,
+  Pressable,
   ScrollView,
   Text,
-  TouchableOpacity,
+  useColorScheme,
+  Vibration,
   View,
 } from "react-native";
+import Animated, {
+  Easing,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+cssInterop(LinearGradient, { className: { target: "style" } });
+
+/* ─── palette ──────────────────────────────────────────────────────────────
+   Saturated fills with a darker "edge" underneath — the chunky, tactile look
+   the rest of this screen is built on. */
+const C = {
+  green: "#58CC02",
+  greenEdge: "#46A302",
+  blue: "#1CB0F6",
+  blueEdge: "#1899D6",
+  brand: "#135bec",
+  brandEdge: "#0e46b8",
+  amber: "#FF9600",
+  amberEdge: "#E08600",
+  red: "#FF4B4B",
+  redEdge: "#EA2B2B",
+  grey: "#AFAFAF",
+  greyEdge: "#8F8F8F",
+};
+
 const SCANNING_MESSAGES = [
-  "Uploading your timetable",
-  "Reading the grid",
-  "Matching subject codes",
+  "Reading your timetable",
+  "Finding subject codes",
   "Working out your slots",
+  "Checking the rooms",
 ];
 
-/** How long each subject row lingers before the next one appears. */
-const ROW_INTERVAL_MS = 320;
+/** How long each subject card stays on screen before the next pops in. */
+const ROW_INTERVAL_MS = 420;
+
+const tick = (strong = false) => {
+  if (Platform.OS === "android") Vibration.vibrate(strong ? 18 : 8);
+  else
+    Haptics.impactAsync(
+      strong
+        ? Haptics.ImpactFeedbackStyle.Medium
+        : Haptics.ImpactFeedbackStyle.Light,
+    );
+};
+
+/* ─── chunky button ───────────────────────────────────────────────────────── */
+
+const ChunkyButton = ({
+  label,
+  color,
+  edge,
+  textColor = "white",
+  onPress,
+  disabled,
+  icon,
+}: {
+  label: string;
+  color: string;
+  edge: string;
+  textColor?: string;
+  onPress: () => void;
+  disabled?: boolean;
+  icon?: keyof typeof Ionicons.glyphMap;
+}) => {
+  const press = useSharedValue(0);
+
+  // The face rides on a 4px lip of the darker edge colour and sinks onto it
+  // when pressed, the way a real key travels.
+  const faceStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: press.value * 4 }],
+  }));
+
+  return (
+    <Pressable
+      disabled={disabled}
+      onPressIn={() => {
+        press.value = withTiming(1, { duration: 60 });
+      }}
+      onPressOut={() => {
+        press.value = withSpring(0, { damping: 14, stiffness: 320 });
+      }}
+      onPress={() => {
+        tick(true);
+        onPress();
+      }}
+      style={{ opacity: disabled ? 0.45 : 1 }}
+    >
+      <View style={{ backgroundColor: edge, borderRadius: 16, paddingBottom: 4 }}>
+        <Animated.View
+          style={[{ backgroundColor: color, borderRadius: 16 }, faceStyle]}
+          className="h-14 items-center justify-center flex-row"
+        >
+          {icon ? (
+            <Ionicons
+              name={icon}
+              size={20}
+              color={textColor}
+              style={{ marginRight: 8 }}
+            />
+          ) : null}
+          <Text
+            style={{ color: textColor }}
+            className="font-extrabold text-base tracking-wide"
+          >
+            {label}
+          </Text>
+        </Animated.View>
+      </View>
+    </Pressable>
+  );
+};
+
+/* ─── confetti ────────────────────────────────────────────────────────────── */
+
+const PIECE_COLORS = [C.green, C.blue, C.amber, C.brand, "#FFC800", "#CE82FF"];
+
+const ConfettiPiece = ({ index }: { index: number }) => {
+  const t = useSharedValue(0);
+
+  // Deterministic spread so the burst looks designed rather than random noise.
+  const angle = (index / 18) * Math.PI * 2;
+  const distance = 90 + (index % 5) * 26;
+  const dx = Math.cos(angle) * distance;
+  const dy = Math.sin(angle) * distance * 0.7;
+  const color = PIECE_COLORS[index % PIECE_COLORS.length];
+  const isCircle = index % 3 === 0;
+
+  useEffect(() => {
+    t.value = withDelay(
+      index * 18,
+      withTiming(1, { duration: 1100, easing: Easing.out(Easing.cubic) }),
+    );
+  }, [t, index]);
+
+  const style = useAnimatedStyle(() => ({
+    opacity: interpolate(t.value, [0, 0.15, 0.75, 1], [0, 1, 1, 0]),
+    transform: [
+      { translateX: t.value * dx },
+      // Arc outward, then let gravity take it down.
+      { translateY: t.value * dy + interpolate(t.value, [0, 1], [0, 160]) },
+      { rotate: `${t.value * (index % 2 ? 540 : -420)}deg` },
+      { scale: interpolate(t.value, [0, 0.2, 1], [0.4, 1, 0.7]) },
+    ],
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          position: "absolute",
+          width: isCircle ? 10 : 8,
+          height: isCircle ? 10 : 14,
+          borderRadius: isCircle ? 5 : 2,
+          backgroundColor: color,
+        },
+      ]}
+    />
+  );
+};
+
+const Confetti = () => (
+  <View
+    className="absolute inset-0 items-center justify-center"
+    pointerEvents="none"
+  >
+    {Array.from({ length: 18 }, (_, i) => (
+      <ConfettiPiece key={i} index={i} />
+    ))}
+  </View>
+);
+
+/* ─── scanning illustration ───────────────────────────────────────────────── */
+
+const PulseRing = ({ delay }: { delay: number }) => {
+  const p = useSharedValue(0);
+
+  useEffect(() => {
+    p.value = withDelay(
+      delay,
+      withRepeat(
+        withTiming(1, { duration: 2000, easing: Easing.out(Easing.quad) }),
+        -1,
+        false,
+      ),
+    );
+  }, [p, delay]);
+
+  const style = useAnimatedStyle(() => ({
+    opacity: interpolate(p.value, [0, 0.3, 1], [0, 0.35, 0]),
+    transform: [{ scale: interpolate(p.value, [0, 1], [0.7, 1.9]) }],
+  }));
+
+  return (
+    <Animated.View
+      style={style}
+      className="absolute w-44 h-44 rounded-full border-4 border-[#135bec]"
+    />
+  );
+};
+
+const ScannerArt = () => {
+  const bob = useSharedValue(0);
+  const beam = useSharedValue(0);
+
+  useEffect(() => {
+    bob.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0, { duration: 1400, easing: Easing.inOut(Easing.ease) }),
+      ),
+      -1,
+      false,
+    );
+    beam.value = withRepeat(
+      withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.quad) }),
+      -1,
+      true,
+    );
+  }, [bob, beam]);
+
+  const cardStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: interpolate(bob.value, [0, 1], [-7, 7]) },
+      { rotate: `${interpolate(bob.value, [0, 1], [-2.5, 2.5])}deg` },
+    ],
+  }));
+
+  const beamStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: interpolate(beam.value, [0, 1], [6, 106]) }],
+    opacity: interpolate(beam.value, [0, 0.5, 1], [0.5, 1, 0.5]),
+  }));
+
+  return (
+    <View className="h-56 items-center justify-center">
+      <PulseRing delay={0} />
+      <PulseRing delay={700} />
+      <PulseRing delay={1400} />
+
+      <Animated.View
+        style={cardStyle}
+        className="w-44 h-32 rounded-2xl bg-white dark:bg-[#1c2433] border-2 border-slate-200 dark:border-white/10 overflow-hidden"
+      >
+        {/* faux timetable grid */}
+        <View className="flex-row px-3 pt-3 gap-1.5">
+          {[0, 1, 2, 3].map((i) => (
+            <View key={i} className="flex-1 h-3 rounded bg-[#135bec]/70" />
+          ))}
+        </View>
+        {[0, 1, 2, 3].map((row) => (
+          <View key={row} className="flex-row px-3 pt-2 gap-1.5">
+            {[0, 1, 2, 3].map((col) => (
+              <View
+                key={col}
+                className={`flex-1 h-3.5 rounded ${
+                  (row + col) % 3 === 0
+                    ? "bg-slate-300 dark:bg-slate-600"
+                    : "bg-slate-100 dark:bg-slate-800"
+                }`}
+              />
+            ))}
+          </View>
+        ))}
+
+        {/* sweeping beam */}
+        <Animated.View style={beamStyle} className="absolute left-0 right-0">
+          <View className="h-6 bg-[#1CB0F6]/25" />
+          <View className="h-1 bg-[#1CB0F6]" />
+        </Animated.View>
+      </Animated.View>
+    </View>
+  );
+};
+
+/* ─── progress bar ────────────────────────────────────────────────────────── */
+
+const ProgressBar = ({
+  value,
+  indeterminate,
+}: {
+  value: number;
+  indeterminate?: boolean;
+}) => {
+  const fill = useSharedValue(0);
+  const sweep = useSharedValue(0);
+
+  useEffect(() => {
+    if (indeterminate) {
+      sweep.value = withRepeat(
+        withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
+        -1,
+        false,
+      );
+    }
+  }, [indeterminate, sweep]);
+
+  useEffect(() => {
+    if (!indeterminate) {
+      fill.value = withSpring(value, { damping: 16, stiffness: 110, mass: 0.8 });
+    }
+  }, [value, indeterminate, fill]);
+
+  const fillStyle = useAnimatedStyle(() => ({
+    width: `${Math.max(fill.value * 100, 3)}%`,
+  }));
+
+  const sweepStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: interpolate(sweep.value, [0, 1], [-140, 340]) }],
+  }));
+
+  return (
+    <View className="h-4 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+      {indeterminate ? (
+        <Animated.View
+          style={sweepStyle}
+          className="h-full w-32 rounded-full bg-[#135bec]"
+        >
+          <View className="h-1.5 mx-2 mt-1 rounded-full bg-white/40" />
+        </Animated.View>
+      ) : (
+        <Animated.View
+          style={fillStyle}
+          className="h-full rounded-full bg-[#58CC02]"
+        >
+          {/* the highlight that makes the fill read as glossy */}
+          <View className="h-1.5 mx-2 mt-1 rounded-full bg-white/40" />
+        </Animated.View>
+      )}
+    </View>
+  );
+};
+
+/* ─── result row ──────────────────────────────────────────────────────────── */
 
 type StatusStyle = {
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
+  edge: string;
   label: string;
 };
 
 const statusStyles = (result: ScanResult): StatusStyle => {
   switch (result.status) {
     case "created":
-      return { icon: "checkmark-circle", color: "#10b981", label: "Created" };
+      return {
+        icon: "checkmark",
+        color: C.green,
+        edge: C.greenEdge,
+        label: "Added",
+      };
     case "updated":
-      return { icon: "sync-circle", color: "#3b82f6", label: "Slots updated" };
+      return { icon: "sync", color: C.blue, edge: C.blueEdge, label: "Updated" };
     case "reused":
-      return { icon: "checkmark-circle-outline", color: "#64748b", label: "Already yours" };
+      return {
+        icon: "checkmark",
+        color: C.grey,
+        edge: C.greyEdge,
+        label: "Already had it",
+      };
     default:
-      return { icon: "alert-circle", color: "#f59e0b", label: "Skipped" };
+      return {
+        icon: "alert",
+        color: C.amber,
+        edge: C.amberEdge,
+        label: "Skipped",
+      };
   }
 };
 
@@ -52,65 +401,180 @@ const skipExplanation = (result: ScanResult) => {
     if (!clash) return "Clashes with another subject";
     return `${formatSlot(clash.slot)} clashes with ${clash.with.join(", ")}`;
   }
-  if (result.reason === "no-slots") return "No time slots could be read for this code";
-  return result.detail || "Could not be created";
+  if (result.reason === "no-slots") return "Couldn't read its time slots";
+  return result.detail || "Couldn't be created";
 };
 
-/** One subject line, fading and sliding in as the replay reaches it. */
 const ResultRow = ({ result }: { result: ScanResult }) => {
-  const anim = useRef(new Animated.Value(0)).current;
+  const isDark = useColorScheme() === "dark";
+  const pop = useSharedValue(0);
+  const badge = useSharedValue(0);
   const style = statusStyles(result);
   const isSkipped = result.status === "skipped";
 
   useEffect(() => {
-    Animated.timing(anim, {
-      toValue: 1,
-      duration: 260,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: true,
-    }).start();
-  }, [anim]);
+    pop.value = withSpring(1, { damping: 13, stiffness: 190, mass: 0.7 });
+    // Badge lands a beat after the card, so the tick reads as a reaction.
+    badge.value = withDelay(90, withSpring(1, { damping: 9, stiffness: 260 }));
+  }, [pop, badge]);
+
+  const cardStyle = useAnimatedStyle(() => ({
+    opacity: pop.value,
+    transform: [
+      { scale: interpolate(pop.value, [0, 1], [0.86, 1]) },
+      { translateY: interpolate(pop.value, [0, 1], [26, 0]) },
+    ],
+  }));
+
+  const badgeStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: interpolate(badge.value, [0, 1], [0, 1]) },
+      { rotate: `${interpolate(badge.value, [0, 1], [-70, 0])}deg` },
+    ],
+  }));
 
   return (
-    <Animated.View
-      style={{
-        opacity: anim,
-        transform: [
-          { translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) },
-        ],
-      }}
-      className="flex-row items-start py-3 border-b border-slate-100 dark:border-slate-800"
-    >
-      <Ionicons name={style.icon} size={20} color={style.color} style={{ marginTop: 1 }} />
-
-      <View className="flex-1 ml-3">
-        <Text
-          className="text-sm font-semibold text-slate-900 dark:text-white"
-          numberOfLines={1}
+    <Animated.View style={cardStyle} className="mb-3">
+      <View
+        style={{
+          borderBottomWidth: 4,
+          borderBottomColor: isSkipped
+            ? isDark
+              ? "#7A4E00"
+              : "#FFE0B2"
+            : isDark
+              ? "#0b1017"
+              : "#E5E7EB",
+        }}
+        className="flex-row items-center rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1c2433] p-3"
+      >
+        <Animated.View
+          style={[
+            badgeStyle,
+            {
+              backgroundColor: style.color,
+              borderBottomWidth: 3,
+              borderBottomColor: style.edge,
+            },
+          ]}
+          className="w-11 h-11 rounded-full items-center justify-center"
         >
-          {result.code}
-        </Text>
-        <Text className="text-xs text-slate-500 dark:text-slate-400 mt-0.5" numberOfLines={1}>
-          {result.name !== result.code ? result.name : "Not in the subject catalogue"}
-        </Text>
+          <Ionicons name={style.icon} size={22} color="white" />
+        </Animated.View>
 
-        {isSkipped ? (
-          <Text className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-            {skipExplanation(result)}
+        <View className="flex-1 ml-3">
+          <Text
+            className="text-base font-extrabold text-slate-900 dark:text-white"
+            numberOfLines={1}
+          >
+            {result.code}
           </Text>
-        ) : (
-          <Text className="text-[11px] text-slate-400 dark:text-slate-500 mt-1" numberOfLines={2}>
-            {result.slots.map(formatSlot).join(" · ")}
+          <Text
+            className="text-xs font-medium text-slate-500 dark:text-slate-400"
+            numberOfLines={1}
+          >
+            {result.name !== result.code ? result.name : "Not in the catalogue"}
           </Text>
-        )}
+
+          {isSkipped ? (
+            <Text
+              className="text-xs font-bold text-[#E08600] mt-1"
+              numberOfLines={2}
+            >
+              {skipExplanation(result)}
+            </Text>
+          ) : (
+            <View className="flex-row flex-wrap mt-1.5">
+              {result.slots.slice(0, 3).map((slot) => (
+                <View
+                  key={slot}
+                  className="rounded-md bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 mr-1 mb-1"
+                >
+                  <Text className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                    {formatSlot(slot)}
+                  </Text>
+                </View>
+              ))}
+              {result.slots.length > 3 && (
+                <View className="rounded-md bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 mb-1">
+                  <Text className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                    +{result.slots.length - 3}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+
+        <Text
+          style={{ color: style.color }}
+          className="text-[10px] font-extrabold uppercase ml-2"
+        >
+          {style.label}
+        </Text>
       </View>
-
-      <Text className="text-[11px] font-semibold ml-2" style={{ color: style.color }}>
-        {style.label}
-      </Text>
     </Animated.View>
   );
 };
+
+/* ─── celebration ─────────────────────────────────────────────────────────── */
+
+const CountUp = ({ to }: { to: number }) => {
+  const [n, setN] = useState(0);
+
+  useEffect(() => {
+    if (to === 0) return;
+    let current = 0;
+    const id = setInterval(
+      () => {
+        current += 1;
+        setN(current);
+        if (current >= to) clearInterval(id);
+      },
+      Math.max(320 / to, 45),
+    );
+    return () => clearInterval(id);
+  }, [to]);
+
+  return <>{n}</>;
+};
+
+const TrophyBadge = ({ tone }: { tone: "win" | "warn" }) => {
+  const pop = useSharedValue(0);
+
+  useEffect(() => {
+    pop.value = withSequence(
+      withSpring(1.15, { damping: 8, stiffness: 200 }),
+      withSpring(1, { damping: 11, stiffness: 240 }),
+    );
+  }, [pop]);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [{ scale: pop.value }],
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          backgroundColor: tone === "win" ? C.green : C.amber,
+          borderBottomWidth: 6,
+          borderBottomColor: tone === "win" ? C.greenEdge : C.amberEdge,
+        },
+      ]}
+      className="w-24 h-24 rounded-full items-center justify-center"
+    >
+      <Ionicons
+        name={tone === "win" ? "trophy" : "construct"}
+        size={46}
+        color="white"
+      />
+    </Animated.View>
+  );
+};
+
+/* ─── screen ──────────────────────────────────────────────────────────────── */
 
 type Props = {
   visible: boolean;
@@ -131,228 +595,255 @@ export const TimetableScanProgress = ({
   onCreateManually,
   onDismiss,
 }: Props) => {
-  const results = data?.results ?? [];
+  const isDark = useColorScheme() === "dark";
+  // Stable identity: this feeds a timer effect, and a fresh array every
+  // render would restart the reveal on any incidental re-render.
+  const results = useMemo(() => data?.results ?? [], [data]);
 
   const [revealed, setRevealed] = useState(0);
   const [messageIndex, setMessageIndex] = useState(0);
-  const progress = useRef(new Animated.Value(0)).current;
-  const shimmer = useRef(new Animated.Value(0)).current;
+  const msgFade = useSharedValue(1);
 
-  // Reset whenever a fresh upload starts.
   useEffect(() => {
-    if (phase === "scanning") {
-      setRevealed(0);
-      progress.setValue(0);
-    }
-  }, [phase, progress]);
-
-  // Cycle the reassuring copy while the scan is in flight.
-  useEffect(() => {
-    if (phase !== "scanning") return;
-    const id = setInterval(
-      () => setMessageIndex((i) => (i + 1) % SCANNING_MESSAGES.length),
-      1600,
-    );
-    return () => clearInterval(id);
+    if (phase === "scanning") setRevealed(0);
   }, [phase]);
 
-  // Indeterminate sweep for the scanning bar.
+  // Cycle the copy with a soft cross-fade rather than a hard swap.
   useEffect(() => {
     if (phase !== "scanning") return;
-    const loop = Animated.loop(
-      Animated.timing(shimmer, {
-        toValue: 1,
-        duration: 1100,
-        easing: Easing.inOut(Easing.ease),
-        useNativeDriver: true,
-      }),
-    );
-    shimmer.setValue(0);
-    loop.start();
-    return () => loop.stop();
-  }, [phase, shimmer]);
+    const id = setInterval(() => {
+      msgFade.value = withSequence(
+        withTiming(0, { duration: 220 }),
+        withTiming(1, { duration: 320 }),
+      );
+      setTimeout(
+        () => setMessageIndex((i) => (i + 1) % SCANNING_MESSAGES.length),
+        220,
+      );
+    }, 2000);
+    return () => clearInterval(id);
+  }, [phase, msgFade]);
 
-  // Walk the report one subject at a time so the student can follow along.
+  const msgStyle = useAnimatedStyle(() => ({
+    opacity: msgFade.value,
+    transform: [{ translateY: interpolate(msgFade.value, [0, 1], [8, 0]) }],
+  }));
+
+  // Walk the report one subject at a time, with a tick on each.
   useEffect(() => {
     if (phase !== "reporting" || revealed >= results.length) return;
-    const id = setTimeout(() => setRevealed((n) => n + 1), ROW_INTERVAL_MS);
+    const id = setTimeout(() => {
+      setRevealed((n) => n + 1);
+      tick(results[revealed]?.status === "skipped");
+    }, ROW_INTERVAL_MS);
     return () => clearTimeout(id);
-  }, [phase, revealed, results.length]);
-
-  useEffect(() => {
-    if (phase !== "reporting" || results.length === 0) return;
-    Animated.timing(progress, {
-      toValue: revealed / results.length,
-      duration: ROW_INTERVAL_MS,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: false,
-    }).start();
-  }, [revealed, results.length, phase, progress]);
+  }, [phase, revealed, results]);
 
   const finished = phase === "reporting" && revealed >= results.length;
+
+  useEffect(() => {
+    if (finished) tick(true);
+  }, [finished]);
+
   const skipped = results.filter((r) => r.status === "skipped");
-  const attached = results.length - skipped.length;
+  const added = results.filter((r) => r.status === "created").length;
+  const updated = results.filter((r) => r.status === "updated").length;
+  const reused = results.filter((r) => r.status === "reused").length;
   const timetableId = data?.timetable?._id ?? "";
+  const allGood = finished && skipped.length === 0 && results.length > 0;
 
   return (
-    <Modal visible={visible} animationType="fade" transparent={false} onRequestClose={onDismiss}>
-      <SafeAreaView className="flex-1 bg-white dark:bg-[#101622]">
-        <View className="px-6 pt-6 pb-4">
-          <Text className="text-2xl font-bold text-slate-900 dark:text-white">
-            {phase === "error"
-              ? "Upload failed"
-              : finished
-                ? "Timetable ready"
-                : "Building your timetable"}
-          </Text>
-          <Text className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            {phase === "error"
-              ? errorMessage || "Something went wrong reading that image."
-              : phase === "scanning"
-                ? SCANNING_MESSAGES[messageIndex]
-                : finished
-                  ? `${attached} subject${attached === 1 ? "" : "s"} added${
-                      skipped.length ? ` · ${skipped.length} skipped` : ""
-                    }`
-                  : `Adding subject ${Math.min(revealed + 1, results.length)} of ${results.length}`}
-          </Text>
-        </View>
-
-        {/* Progress track */}
-        {phase !== "error" && (
-          <View className="px-6">
-            <View className="h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-              {phase === "scanning" ? (
-                <Animated.View
-                  className="h-full w-1/3 rounded-full bg-[#135bec]"
-                  style={{
-                    transform: [
-                      {
-                        translateX: shimmer.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [-120, 320],
-                        }),
-                      },
-                    ],
-                  }}
-                />
-              ) : (
-                <Animated.View
-                  className="h-full rounded-full bg-[#135bec]"
-                  style={{
-                    width: progress.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ["0%", "100%"],
-                    }),
-                  }}
-                />
-              )}
-            </View>
-          </View>
-        )}
-
+    <Modal visible={visible} animationType="slide" onRequestClose={onDismiss}>
+      <SafeAreaView className="flex-1 bg-[#f6f6f8] dark:bg-[#101622]">
         <ScrollView
-          className="flex-1 px-6 mt-4"
-          contentContainerStyle={{ paddingBottom: 24 }}
+          className="flex-1"
+          contentContainerStyle={{ padding: 20, paddingBottom: 8 }}
           showsVerticalScrollIndicator={false}
         >
-          {phase === "scanning" && (
-            <View className="items-center py-16">
-              <ActivityIndicator size="large" color="#135bec" />
-              <Text className="text-xs text-slate-400 dark:text-slate-500 mt-4">
-                This usually takes a few seconds
-              </Text>
-            </View>
-          )}
-
-          {phase === "reporting" &&
-            results
-              .slice(0, revealed)
-              .map((result) => <ResultRow key={result.code} result={result} />)}
-
-          {phase === "reporting" && results.length === 0 && (
-            <View className="items-center py-16 px-4">
-              <Ionicons name="scan-outline" size={40} color="#94a3b8" />
-              <Text className="text-sm text-slate-500 dark:text-slate-400 mt-4 text-center">
-                No subject codes could be read from that image. Your timetable was
-                created — you can add subjects to it manually.
-              </Text>
-            </View>
-          )}
-
-          {/* What was skipped, and why */}
-          {finished && skipped.length > 0 && (
-            <View className="mt-6 rounded-2xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-900/20 p-4">
-              <View className="flex-row items-center mb-2">
-                <Ionicons name="alert-circle" size={18} color="#f59e0b" />
-                <Text className="text-sm font-bold text-amber-800 dark:text-amber-300 ml-2">
-                  {skipped.length} subject{skipped.length === 1 ? "" : "s"} skipped
-                </Text>
+          {/* ── error ── */}
+          {phase === "error" && (
+            <View className="items-center pt-16">
+              <View
+                style={{
+                  backgroundColor: C.red,
+                  borderBottomWidth: 6,
+                  borderBottomColor: C.redEdge,
+                }}
+                className="w-24 h-24 rounded-full items-center justify-center"
+              >
+                <Ionicons name="close" size={48} color="white" />
               </View>
-              <Text className="text-xs text-amber-700 dark:text-amber-400 leading-4 mb-3">
-                These were left off because their slots clash. Create them yourself and
-                pick the slots you actually attend.
+              <Text className="text-2xl font-extrabold text-slate-900 dark:text-white mt-6 text-center">
+                That didn&apos;t work
               </Text>
-              {skipped.map((result) => (
-                <View key={result.code} className="mt-2">
-                  <Text className="text-xs font-semibold text-amber-900 dark:text-amber-200">
-                    {result.code}
-                    {result.name !== result.code ? ` · ${result.name}` : ""}
+              <Text className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-2 text-center px-4">
+                {errorMessage || "Something went wrong reading that image."}
+              </Text>
+            </View>
+          )}
+
+          {/* ── scanning ── */}
+          {phase === "scanning" && (
+            <View className="pt-6">
+              <ScannerArt />
+              <Text className="text-2xl font-extrabold text-slate-900 dark:text-white text-center mt-4">
+                Building your timetable
+              </Text>
+              <Animated.View style={msgStyle}>
+                <Text className="text-base font-bold text-[#135bec] text-center mt-2">
+                  {SCANNING_MESSAGES[messageIndex]}
+                </Text>
+              </Animated.View>
+              <View className="mt-8">
+                <ProgressBar value={0} indeterminate />
+              </View>
+              <Text className="text-xs font-semibold text-slate-400 dark:text-slate-500 text-center mt-4">
+                This takes a few seconds
+              </Text>
+            </View>
+          )}
+
+          {/* ── reporting / done ── */}
+          {phase === "reporting" && (
+            <>
+              {finished ? (
+                <View className="items-center pt-4 pb-2">
+                  <View className="h-28 items-center justify-center">
+                    {allGood && <Confetti />}
+                    <TrophyBadge tone={skipped.length ? "warn" : "win"} />
+                  </View>
+                  <Text className="text-3xl font-extrabold text-slate-900 dark:text-white mt-5 text-center">
+                    {skipped.length ? "Almost there!" : "Timetable ready!"}
                   </Text>
-                  <Text className="text-[11px] text-amber-700 dark:text-amber-400 mt-0.5">
-                    {skipExplanation(result)}
+
+                  {/* stat pills */}
+                  <View className="flex-row justify-center mt-4 gap-2">
+                    {[
+                      { n: added, label: "added", color: C.green },
+                      { n: updated, label: "updated", color: C.blue },
+                      { n: reused, label: "kept", color: C.grey },
+                      { n: skipped.length, label: "skipped", color: C.amber },
+                    ]
+                      .filter((s) => s.n > 0)
+                      .map((s) => (
+                        <View
+                          key={s.label}
+                          style={{ borderColor: s.color }}
+                          className="rounded-2xl border-2 bg-white dark:bg-[#1c2433] px-3 py-2 items-center"
+                        >
+                          <Text
+                            style={{ color: s.color }}
+                            className="text-xl font-extrabold"
+                          >
+                            <CountUp to={s.n} />
+                          </Text>
+                          <Text className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">
+                            {s.label}
+                          </Text>
+                        </View>
+                      ))}
+                  </View>
+                </View>
+              ) : (
+                <View className="pb-4">
+                  <Text className="text-2xl font-extrabold text-slate-900 dark:text-white">
+                    Adding your subjects
+                  </Text>
+                  <Text className="text-sm font-bold text-[#135bec] mt-1">
+                    {Math.min(revealed + 1, results.length)} of {results.length}
                   </Text>
                 </View>
+              )}
+
+              <View className="mb-5 mt-1">
+                <ProgressBar
+                  value={results.length ? revealed / results.length : 1}
+                />
+              </View>
+
+              {results.slice(0, revealed).map((result) => (
+                <ResultRow key={result.code} result={result} />
               ))}
-            </View>
+
+              {results.length === 0 && (
+                <View className="items-center py-14 px-6">
+                  <View
+                    style={{
+                      backgroundColor: C.amber,
+                      borderBottomWidth: 5,
+                      borderBottomColor: C.amberEdge,
+                    }}
+                    className="w-20 h-20 rounded-full items-center justify-center"
+                  >
+                    <Ionicons name="scan" size={38} color="white" />
+                  </View>
+                  <Text className="text-lg font-extrabold text-slate-900 dark:text-white mt-5 text-center">
+                    Nothing readable in that image
+                  </Text>
+                  <Text className="text-sm font-medium text-slate-500 dark:text-slate-400 mt-2 text-center">
+                    Your timetable was created — you can add subjects to it
+                    yourself.
+                  </Text>
+                </View>
+              )}
+
+              {/* skipped detail */}
+              {finished && skipped.length > 0 && (
+                <LinearGradient
+                  colors={isDark ? ["#3a2a05", "#2a1f08"] : ["#FFF7E6", "#FFEFD0"]}
+                  className="rounded-2xl p-4 mt-2 border-2 border-[#FF9600]/40"
+                >
+                  <View className="flex-row items-center mb-2">
+                    <Ionicons name="alert-circle" size={20} color={C.amber} />
+                    <Text className="text-sm font-extrabold text-[#E08600] ml-2">
+                      {skipped.length} left out
+                    </Text>
+                  </View>
+                  <Text className="text-xs font-medium text-[#B36B00] dark:text-amber-300 leading-4">
+                    Their slots clash, so we didn&apos;t guess. Add them yourself
+                    and pick the slots you actually attend.
+                  </Text>
+                </LinearGradient>
+              )}
+            </>
           )}
         </ScrollView>
 
-        {/* Actions */}
-        <View className="px-6 pb-6 pt-2 gap-3">
+        {/* ── actions ── */}
+        <View className="px-5 pb-5 pt-3 gap-3 bg-[#f6f6f8] dark:bg-[#101622]">
           {phase === "error" ? (
-            <TouchableOpacity
+            <ChunkyButton
+              label="GO BACK"
+              color={C.brand}
+              edge={C.brandEdge}
               onPress={onDismiss}
-              className="h-14 rounded-xl items-center justify-center bg-[#135bec]"
-            >
-              <Text className="text-white font-bold text-base">Back</Text>
-            </TouchableOpacity>
+            />
           ) : (
             <>
               {finished && skipped.length > 0 && (
-                <TouchableOpacity
+                <ChunkyButton
+                  label="ADD THE REST"
+                  icon="add-circle"
+                  color={C.amber}
+                  edge={C.amberEdge}
                   onPress={() => onCreateManually(skipped, timetableId)}
-                  className="h-14 rounded-xl items-center justify-center bg-[#135bec]"
-                >
-                  <Text className="text-white font-bold text-base">
-                    Create the skipped subjects
-                  </Text>
-                </TouchableOpacity>
+                />
               )}
-
-              <TouchableOpacity
+              <ChunkyButton
+                label={finished ? "SEE MY TIMETABLE" : "HANG TIGHT…"}
+                color={
+                  finished ? (skipped.length ? C.grey : C.green) : C.grey
+                }
+                edge={
+                  finished
+                    ? skipped.length
+                      ? C.greyEdge
+                      : C.greenEdge
+                    : C.greyEdge
+                }
                 disabled={!finished}
                 onPress={() => onViewTimetable(timetableId)}
-                className={`h-14 rounded-xl items-center justify-center ${
-                  !finished
-                    ? "bg-slate-200 dark:bg-slate-800"
-                    : skipped.length > 0
-                      ? "bg-slate-100 dark:bg-slate-800"
-                      : "bg-[#135bec]"
-                }`}
-              >
-                <Text
-                  className={`font-bold text-base ${
-                    !finished
-                      ? "text-slate-400 dark:text-slate-600"
-                      : skipped.length > 0
-                        ? "text-slate-700 dark:text-slate-200"
-                        : "text-white"
-                  }`}
-                >
-                  {finished ? "View timetable" : "Please wait…"}
-                </Text>
-              </TouchableOpacity>
+              />
             </>
           )}
         </View>
