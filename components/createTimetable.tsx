@@ -137,7 +137,7 @@ export default function CreateTimetable() {
               <Text className="text-[#111318] dark:text-white/90 text-xs font-bold uppercase tracking-widest mb-2">
                 Semester
               </Text>
-              <View className="flex-row flex-wrap gap-2">
+              <View className="flex-row flex-wrap justify-between gap-y-3">
                 {SEMESTERS.map((sem) => {
                   const isSelected = semester === sem.toString();
                   return (
@@ -152,7 +152,8 @@ export default function CreateTimetable() {
                         }
                         setSemester(sem.toString());
                       }}
-                      className={`w-14 h-14 rounded-xl border items-center justify-center ${
+                      style={{ width: `${100 / 5 - 2}%` }}
+                      className={`h-14 rounded-xl border items-center justify-center ${
                         isSelected
                           ? "bg-[#135bec] border-[#135bec]"
                           : "bg-white dark:bg-[#1c2433] border-[#dbdfe6] dark:border-white/10"
