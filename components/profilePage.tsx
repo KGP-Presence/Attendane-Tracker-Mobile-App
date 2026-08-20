@@ -1,10 +1,10 @@
+import { PatternArt } from "@/components/PatternArt";
 import { useLogout } from "@/hooks/useLogout";
 import { useMe } from "@/hooks/useMe";
 import { MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
 import {
-  Image,
   Platform,
   RefreshControl,
   ScrollView,
@@ -164,11 +164,9 @@ export default function UserProfile() {
         {/* Profile Header */}
         <View className="flex-col items-center pt-6 pb-6 px-4">
           <View className="relative">
-            <Image
-              source={{
-                uri: `https://picsum.photos/seed/${data._id}/400/200`,
-              }} // Placeholder for Google Image
-              className="h-28 w-28 rounded-full border-4 border-white dark:border-gray-800"
+            <PatternArt
+              seed={data._id}
+              className="h-28 w-28 overflow-hidden rounded-full border-4 border-white dark:border-gray-800"
             />
             <View className="absolute bottom-1 right-1 bg-white dark:bg-gray-800 p-1.5 rounded-full shadow-sm border border-gray-100 dark:border-gray-700">
               <MaterialIcons name="check-circle" size={16} color="#22c55e" />

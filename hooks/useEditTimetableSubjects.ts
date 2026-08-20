@@ -10,7 +10,7 @@ export const useAddSubjectsToTimetable = (timetableId: string) => {
         mutationFn: async (subjectIds: string[]) => {
             return timetableApi.AddSubjectsToTimetable(api, timetableId, subjectIds);
         },
-        onSuccess: () => {
+        onSuccess: (data) => {
             queryClient.invalidateQueries({
                 queryKey: ['timetable', timetableId, 'subjects'],
             });
@@ -21,9 +21,16 @@ export const useAddSubjectsToTimetable = (timetableId: string) => {
                 queryKey: ['subjects', 'semester'],
             });
 
+            const skipped = data?.skipped ?? [];
+
             Toast.show({
-                type: "success",
-                text1: "Subjects added to timetable successfully",
+                type: skipped.length ? "info" : "success",
+                text1: skipped.length
+                    ? `${data?.added?.length ?? 0} added, ${skipped.length} skipped`
+                    : "Subjects added to timetable successfully",
+                text2: skipped.length
+                    ? `Slot clash: ${skipped.map((s: any) => s.code).join(", ")}`
+                    : undefined,
             });
             router.replace(`/timetable/editTimetable/${timetableId}`);
         },

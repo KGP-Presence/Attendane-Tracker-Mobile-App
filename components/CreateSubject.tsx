@@ -21,6 +21,21 @@ import { router, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 
+/**
+ * Turns one slot token from SubjectsData ("C3", "F4", a single lab letter like
+ * "J", or "EAA") into its time blocks. Returns null for anything unrecognised
+ * so an odd code leaves the form blank instead of crashing the screen.
+ */
+const resolveSlotToken = (token: string): string[] | null => {
+  if (timeSlots[token]) return timeSlots[token];
+
+  const prefix = token.substring(0, 2);
+  const index = Number(token.substring(2)) - 1;
+  if (timeSlots[prefix]?.[index]) return [timeSlots[prefix][index]];
+
+  return null;
+};
+
 const dayMap = {
   SUNDAY: 0,
   MONDAY: 1,
@@ -119,17 +134,15 @@ export default function CreateSubjectPage() {
       setVenues([...new Set(parsedVenues)]);
 
       if (fetchedSubject.slots) {
-        const slots = fetchedSubject.slots.split(/[ ,]+/);
+        const slots = (fetchedSubject.slots as string)
+          .split(/[ ,]+/)
+          .filter(Boolean);
         let mappedTimeBlocks: string[] = [];
-        (slots as string[]).map((slot: string) => {
-          if (slot.length === 1)
-            mappedTimeBlocks = [...mappedTimeBlocks, ...timeSlots[slot]];
-          else
-            mappedTimeBlocks = [
-              ...mappedTimeBlocks,
-              timeSlots[slot.substring(0, 2)][Number(slot.substring(2)) - 1],
-            ];
+        slots.forEach((slot: string) => {
+          const blocks = resolveSlotToken(slot);
+          if (blocks) mappedTimeBlocks = [...mappedTimeBlocks, ...blocks];
         });
+        mappedTimeBlocks = [...new Set(mappedTimeBlocks)];
         mappedTimeBlocks.sort((a, b) => {
           const dayA = dayMap[a.split("_")[0] as keyof typeof dayMap],
             dayB = dayMap[b.split("_")[0] as keyof typeof dayMap];
@@ -138,12 +151,13 @@ export default function CreateSubjectPage() {
         });
         setSelectedSlots(mappedTimeBlocks);
 
-        let count = 0;
+        let labSlotCount = 0;
         slots.forEach((slot: string) => {
-          if (slot.length === 1) count++;
+          if (slot.length === 1) labSlotCount++;
         });
-        if (count === 0) setType("THEORY");
-        else if (count === slots.length) setType("LAB");
+        if (labSlotCount === 0) setType("THEORY");
+        else if (labSlotCount === slots.length) setType("LAB");
+        else setType("OTHER");
       }
     } else {
       setSubjectName("");
@@ -184,7 +198,14 @@ export default function CreateSubjectPage() {
     } else {
       // Loop is finished (or we only had one subject)!
       if (timetableId && finalIdsToSubmit.length > 0) {
-        router.replace(`/timetable/addSubjectToTimetable/${timetableId}`);
+        // Attach them straight away instead of making the student pick the
+        // same subjects again on the manual "add subjects" screen.
+        addToTimetable(finalIdsToSubmit);
+      } else if (timetableId) {
+        router.replace({
+          pathname: "/timetable/[id]",
+          params: { id: timetableId },
+        });
       } else {
         if (router.canGoBack()) router.back();
       }
@@ -214,6 +235,14 @@ export default function CreateSubjectPage() {
           // Change `data.id` to `data._id` if you use MongoDB!
           const newSubjectId = data.id || data._id;
           handleNextStep(newSubjectId);
+        },
+        onError: (error: any) => {
+          // The student already owns this code — reuse that subject and keep
+          // the queue moving rather than dead-ending on the conflict.
+          const existingSubjectId =
+            error?.response?.data?.errors?.[0]?.existingSubjectId;
+
+          if (existingSubjectId) handleNextStep(existingSubjectId);
         },
       },
     );
