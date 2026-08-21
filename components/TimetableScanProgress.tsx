@@ -610,7 +610,7 @@ type Props = {
   phase: "scanning" | "reporting" | "error";
   data?: TimetableScanResponse;
   errorMessage?: string;
-  onViewTimetables: () => void;
+  onViewTimetables: (semester?: number) => void;
   onRetry: () => void;
   onDismiss: () => void;
 };
@@ -890,7 +890,7 @@ export const TimetableScanProgress = ({
               color={finished ? C.green : C.grey}
               edge={finished ? C.greenEdge : C.greyEdge}
               disabled={!finished}
-              onPress={onViewTimetables}
+              onPress={() => onViewTimetables(data?.timetable?.semester)}
             />
           )}
         </View>

@@ -2,7 +2,7 @@ import LoadingScreen from "@/components/Loading";
 import { TimetableCard } from "@/components/TimetableCard";
 import { useGetUserTimetables } from "@/hooks/useGetUserTimetables";
 import { TimetableCardType } from "@/types/timetableTypes";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { ArrowBigLeft, ArrowLeft, ChevronLeft, Menu, Plus, Search, User, UserCircle, Filter } from "lucide-react-native";
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
@@ -28,6 +28,7 @@ export default function TimetableScreen() {
   // Destructure refetch from your custom hook
   const { data, isLoading, isError, refetch } = useGetUserTimetables();
   const { colorScheme } = useColorScheme();
+  const { focusSemester } = useLocalSearchParams<{ focusSemester?: string }>();
   const [searchQuery, setSearchQuery] = useState("");
   
   // State for semester filtering
@@ -47,12 +48,18 @@ export default function TimetableScreen() {
     return [...new Set(semesters)].sort((a: unknown, b: unknown) => (b as number) - (a as number));
   }, [data]);
 
+  // A screen that just created a timetable says which semester to show, so a
+  // freshly made one isn't hidden behind the default filter below.
+  useEffect(() => {
+    if (focusSemester) setSelectedSemester(Number(focusSemester));
+  }, [focusSemester]);
+
   // Set the highest semester as default when data loads
   useEffect(() => {
-    if (uniqueSemesters.length > 0 && selectedSemester === null) {
+    if (!focusSemester && uniqueSemesters.length > 0 && selectedSemester === null) {
       setSelectedSemester(uniqueSemesters[0] as number);
     }
-  }, [uniqueSemesters, selectedSemester]);
+  }, [uniqueSemesters, selectedSemester, focusSemester]);
 
   const filteredData = data?.filter((timetable: TimetableCardType) => {
     const matchesSearch = timetable.name.toLowerCase().includes(searchQuery.toLowerCase());
