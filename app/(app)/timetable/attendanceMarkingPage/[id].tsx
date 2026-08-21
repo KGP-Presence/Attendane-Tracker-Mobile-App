@@ -1,6 +1,7 @@
 import { ClassCard } from "@/components/ClassCard";
 import { ClassSession, useDailyClasses } from "@/hooks/scheduleLogic";
 import { useGetAttendanceForDateByTimetable } from "@/hooks/useGetAttendanceForDateByTimetable";
+import { api, attendanceApi } from "@/utils/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Audio } from "expo-av";
 import * as Haptics from "expo-haptics";
@@ -21,7 +22,9 @@ import {
 } from "lucide-react-native";
 import { useColorScheme } from "nativewind";
 import React, { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
+  Alert,
   Modal,
   Platform,
   ScrollView,
@@ -29,7 +32,8 @@ import {
   TouchableOpacity,
   Vibration,
   View,
-  Switch
+  Switch,
+  ActivityIndicator
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SOUND_DICTIONARY } from "../../../../constants/sound_dict";
@@ -239,6 +243,8 @@ const ScheduleScreen = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [anchorDate, setAnchorDate] = useState<Date>(new Date());
   const [isSoundModalOpen, setIsSoundModalOpen] = useState(false);
+  const [isMarkingAllPresent, setIsMarkingAllPresent] = useState(false);
+  const queryClient = useQueryClient();
 
   const { playSound, reloadSounds } = useAttendanceSounds();
 
@@ -280,6 +286,55 @@ const ScheduleScreen = () => {
   const todaysClasses: ClassSession[] = useDailyClasses(data?.classes || []);
   const morningClasses = todaysClasses.filter((c) => c.sortTime <= 1300);
   const afternoonClasses = todaysClasses.filter((c) => c.sortTime > 1300);
+  const unmarkedSlots = todaysClasses.flatMap((classItem) =>
+    classItem.slotDetails
+      .filter((slot) => slot.status === "UNMARKED")
+      .map((slot) => ({ classItem, slot })),
+  );
+
+  const markAllPresent = async () => {
+    if (isMarkingAllPresent || unmarkedSlots.length === 0) return;
+
+    if (Platform.OS === "android") {
+      Vibration.vibrate(20);
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+
+    setIsMarkingAllPresent(true);
+    const results = await Promise.allSettled(
+      unmarkedSlots.map(({ classItem, slot }) =>
+        attendanceApi.createAttendance(
+          api,
+          classItem.subjectId,
+          classItem.day,
+          "PRESENT",
+          slot.timeSlot,
+          localISODate,
+          classItem.semester,
+        ),
+      ),
+    );
+    const failedCount = results.filter((result) => result.status === "rejected").length;
+
+    await queryClient.invalidateQueries({
+      queryKey: ["attendance", id, localISODate],
+    });
+    setIsMarkingAllPresent(false);
+
+    if (failedCount > 0) {
+      Alert.alert(
+        "Some classes were not updated",
+        `${failedCount} of ${unmarkedSlots.length} class slots could not be marked present.`,
+      );
+      return;
+    }
+
+    Alert.alert(
+      "Done",
+      `${unmarkedSlots.length} class ${unmarkedSlots.length === 1 ? "slot" : "slots"} marked present.`,
+    );
+  };
 
   const formatDay = (date: Date): string =>
     ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][date.getDay()];
@@ -395,9 +450,37 @@ const ScheduleScreen = () => {
               <Text className="text-blue-100 text-sm">
                 {selectedDate.toDateString()}
               </Text>
-              <Text className="text-blue-100 text-xs mt-1 opacity-80">
-                {todaysClasses.length} classes scheduled
-              </Text>
+              <View className="flex-row items-center mt-1">
+                <Text className="text-blue-100 text-xs opacity-80">
+                  {todaysClasses.length} classes scheduled
+                </Text>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  disabled={isMarkingAllPresent || unmarkedSlots.length === 0}
+                  onPress={markAllPresent}
+                  className="ml-3 flex-row items-center"
+                >
+                  {isMarkingAllPresent ? (
+                    <ActivityIndicator size="small" color="#bfdbfe" />
+                  ) : (
+                    <>
+                      <CheckCircle
+                        size={13}
+                        color={unmarkedSlots.length === 0 ? "#93c5fd" : "#ffffff"}
+                      />
+                      <Text
+                        className={`ml-1 text-xs font-bold ${
+                          unmarkedSlots.length === 0 ? "text-blue-200/60" : "text-white"
+                        }`}
+                      >
+                        {todaysClasses.length > 0 && unmarkedSlots.length === 0
+                          ? "All marked"
+                          : "Mark all present"}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
             <View className="bg-white/20 px-2 py-1 rounded-lg">
               <Text className="text-white text-[10px] font-bold">
@@ -405,6 +488,7 @@ const ScheduleScreen = () => {
               </Text>
             </View>
           </View>
+
         </View>
 
         <View className="border-l-2 border-slate-200 dark:border-slate-800 ml-3 pl-6 space-y-8 pb-24">
