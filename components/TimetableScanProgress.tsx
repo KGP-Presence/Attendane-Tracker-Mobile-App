@@ -1,4 +1,4 @@
-import { ScanFeedback } from "@/hooks/useScanFeedback";
+import { ScanCue } from "@/hooks/useScanFeedback";
 import {
   formatSlot,
   ScanResult,
@@ -70,8 +70,6 @@ const ROW_INTERVAL_MS = 600;
 /** Playing a clip costs a JS->native round trip, so the cue is fired slightly
  *  ahead of the card's animation to make the two coincide. */
 const AUDIO_LEAD_MS = 90;
-
-
 
 /**
  * The bar climbs steadily to 99% over 20s while the scan runs — about how long
@@ -614,7 +612,7 @@ type Props = {
   data?: TimetableScanResponse;
   errorMessage?: string;
   /** Preloaded on the parent screen so the clips are ready before the scan. */
-  feedback: ScanFeedback;
+  feedback: (cue: ScanCue) => void;
   onViewTimetables: () => void;
   onRetry: () => void;
   onDismiss: () => void;
@@ -664,7 +662,7 @@ export const TimetableScanProgress = ({
     if (total === 0) {
       progress.value = withTiming(1, { duration: 400 });
       setFinished(true);
-      feedback.cue("complete");
+      feedback("complete");
       return;
     }
 
@@ -675,13 +673,13 @@ export const TimetableScanProgress = ({
     // card animations instead of drifting the way a chained timer does.
     const timers = results.map((result, i) =>
       setTimeout(
-        () => feedback.cue(result.status === "skipped" ? "skip" : "pop"),
+        () => feedback(result.status === "skipped" ? "skip" : "pop"),
         Math.max(0, i * ROW_INTERVAL_MS - AUDIO_LEAD_MS),
       ),
     );
     const done = setTimeout(() => {
       setFinished(true);
-      feedback.cue("complete");
+      feedback("complete");
     }, runFor + 120);
 
     return () => {
@@ -689,12 +687,6 @@ export const TimetableScanProgress = ({
       clearTimeout(done);
     };
   }, [phase, results, progress, feedback]);
-
-  // A continuous sweep under the scanning phase; silence everywhere else.
-  useEffect(() => {
-    feedback.setAmbient(phase === "scanning");
-    return () => feedback.setAmbient(false);
-  }, [phase, feedback]);
 
   // Cycle the copy with a soft cross-fade rather than a hard swap.
   useEffect(() => {
