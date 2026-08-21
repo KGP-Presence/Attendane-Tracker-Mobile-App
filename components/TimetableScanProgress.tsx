@@ -71,6 +71,9 @@ const ROW_INTERVAL_MS = 600;
  *  ahead of the card's animation to make the two coincide. */
 const AUDIO_LEAD_MS = 90;
 
+/** Matches the beam sweep in ScannerArt, so the tick reads as the beam passing. */
+const SCAN_TICK_MS = 1600;
+
 /**
  * The bar climbs steadily to 99% over 20s while the scan runs — about how long
  * a scan takes — then the reveal carries it to 100%. It stops just short so it
@@ -685,6 +688,13 @@ export const TimetableScanProgress = ({
       clearTimeout(done);
     };
   }, [phase, results, progress, feedback]);
+
+  // A quiet tick each time the beam sweeps, so the wait has a pulse to it.
+  useEffect(() => {
+    if (phase !== "scanning") return;
+    const id = setInterval(() => feedback("scan"), SCAN_TICK_MS);
+    return () => clearInterval(id);
+  }, [phase, feedback]);
 
   // Cycle the copy with a soft cross-fade rather than a hard swap.
   useEffect(() => {

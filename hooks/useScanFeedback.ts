@@ -6,12 +6,13 @@ import { Vibration } from "react-native";
 /**
  * Sound + vibration for the timetable scan screen.
  *
- * Clips are preloaded once so playback at reveal time is instant, and the
- * app-wide `sounds_enabled` switch is honoured — the same flag the attendance
- * sounds use. Vibration is independent of it.
+ * Clips are preloaded once so playback at cue time is instant, and the app-wide
+ * `sounds_enabled` switch is honoured — the same flag the attendance sounds
+ * use. Vibration is independent of it.
  */
 
 const CLIPS = {
+  scan: require("@/assets/sounds/scan/scan.wav"),
   pop: require("@/assets/sounds/scan/pop.wav"),
   skip: require("@/assets/sounds/scan/skip.wav"),
   complete: require("@/assets/sounds/scan/complete.wav"),
@@ -19,8 +20,19 @@ const CLIPS = {
 
 export type ScanCue = keyof typeof CLIPS;
 
-/** Vibration patterns, kept short so a long report doesn't buzz constantly. */
-const PATTERNS: Record<ScanCue, number | number[]> = {
+const VOLUMES: Record<ScanCue, number> = {
+  scan: 0.3,
+  pop: 0.55,
+  skip: 0.55,
+  complete: 0.8,
+};
+
+/**
+ * Vibration patterns, kept short so a long report doesn't buzz constantly.
+ * `scan` repeats every couple of seconds while waiting, so it stays silent on
+ * the motor — a 20s buzz would be maddening.
+ */
+const PATTERNS: Partial<Record<ScanCue, number | number[]>> = {
   pop: 12,
   skip: [0, 22, 45, 22],
   complete: [0, 30, 55, 30, 55, 60],
@@ -38,37 +50,55 @@ export const useScanFeedback = () => {
       try {
         enabled.current =
           (await AsyncStorage.getItem("sounds_enabled")) !== "false";
-        if (!enabled.current) return;
+      } catch {
+        enabled.current = true;
+      }
 
+      if (!enabled.current) return;
+
+      try {
         // Let the cues play even with the iOS ringer switch off — they're
         // feedback on an action the user just took, not media.
         await Audio.setAudioModeAsync({
           playsInSilentModeIOS: true,
           shouldDuckAndroid: true,
         });
+      } catch (error) {
+        // Not fatal: the clips can still play under the default audio mode.
+        console.warn("[scan] audio mode:", error);
+      }
 
-        for (const key of Object.keys(CLIPS) as ScanCue[]) {
+      for (const key of Object.keys(CLIPS) as ScanCue[]) {
+        // Each clip loads independently — one failure must not cost the rest.
+        try {
           const { sound } = await Audio.Sound.createAsync(CLIPS[key], {
-            volume: key === "complete" ? 0.8 : 0.55,
+            volume: VOLUMES[key],
           });
+
           if (!mounted.current) {
-            await sound.unloadAsync();
+            await sound.unloadAsync().catch(() => {});
             return;
           }
 
-          // First playback of a clip is noticeably slower than the rest, which
-          // would put the opening cue behind its card. Run one silent pass so
-          // the native player is ready before the reveal starts.
-          await sound.setVolumeAsync(0);
-          await sound.playAsync();
-          await sound.stopAsync();
-          await sound.setVolumeAsync(key === "complete" ? 0.8 : 0.55);
-
+          // Register before warming up. The warm-up is an optimisation, and
+          // anything it throws must not stop the clip being playable.
           sounds.current[key] = sound;
+
+          try {
+            // First playback of a clip is slower than the rest, which would put
+            // the opening cue behind its card. One silent pass primes it.
+            await sound.setVolumeAsync(0);
+            await sound.playAsync();
+            await sound.pauseAsync();
+            await sound.setPositionAsync(0);
+          } catch {
+            /* priming is best-effort */
+          } finally {
+            await sound.setVolumeAsync(VOLUMES[key]).catch(() => {});
+          }
+        } catch (error) {
+          console.warn(`[scan] could not load ${key}:`, error);
         }
-      } catch (error) {
-        // Audio is a nicety; never let it break the screen.
-        console.warn("Scan sounds unavailable:", error);
       }
     })();
 
@@ -83,7 +113,8 @@ export const useScanFeedback = () => {
   }, []);
 
   return useCallback((cue: ScanCue) => {
-    Vibration.vibrate(PATTERNS[cue]);
+    const pattern = PATTERNS[cue];
+    if (pattern !== undefined) Vibration.vibrate(pattern);
 
     const sound = sounds.current[cue];
     if (!sound || !enabled.current) return;
