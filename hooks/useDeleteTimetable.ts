@@ -1,11 +1,11 @@
 import { api, timetableApi } from "@/utils/api";
-import { useMutation, QueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { router } from "expo-router";
 import Toast from "react-native-toast-message";
 
 export const useDeleteTimetable = (timetableId: string) => {
-    const queryClient = new QueryClient();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
       return timetableApi.deleteTimetable(api, timetableId);
