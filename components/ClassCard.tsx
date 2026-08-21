@@ -3,6 +3,7 @@ import { useAttendanceSounds } from "@/hooks/useAttendanceSound";
 import { useCreateAttendance } from "@/hooks/useCreateAttendance";
 import { api, attendanceApi } from "@/utils/api";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
 import {
   Activity,
@@ -254,6 +255,16 @@ export const ClassCard = ({
   const getSlotDisplayStatus = (slot: { timeSlot: string; status: string }) =>
     optimisticStatuses[slot.timeSlot] || slot.status;
 
+  const handleOpenSubjectDetails = () => {
+    if (Platform.OS === "android") {
+      Vibration.vibrate(20);
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+
+    router.push(`/subject/details/${item.subjectId}`);
+  };
+
   const applyOptimisticStatusForSlots = (
     slots: { timeSlot: string }[],
     statusName: string,
@@ -473,7 +484,11 @@ export const ClassCard = ({
         style={{ elevation: 4 }}
       >
         <View className="flex-row justify-between items-start">
-          <View className="flex-1">
+          <TouchableOpacity
+            className="flex-1 pr-2"
+            activeOpacity={0.8}
+            onPress={handleOpenSubjectDetails}
+          >
             <Text className="text-[10px] font-bold text-blue-500/80 uppercase tracking-widest mb-1">
               {item.subjectCode}
             </Text>
@@ -513,7 +528,7 @@ export const ClassCard = ({
                 </TouchableOpacity>
               )}
             </View>
-          </View>
+          </TouchableOpacity>
 
           {!allUnmarked && !(isMultiSlot && isExpanded) && (
             <TouchableOpacity
