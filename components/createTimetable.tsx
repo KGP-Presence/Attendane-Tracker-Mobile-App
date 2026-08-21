@@ -133,15 +133,9 @@ export default function CreateTimetable() {
         errorMessage={scanError}
         onDismiss={() => setScanPhase("idle")}
         onRetry={() => lastFormData && runScan(lastFormData)}
-        onViewTimetables={(semester) => {
+        onViewTimetables={() => {
           setScanPhase("idle");
-          // The list defaults its filter to the highest semester it knows
-          // about, which hides a timetable made for an earlier one. Tell it
-          // which semester to show so the new timetable is actually visible.
-          router.replace({
-            pathname: "/(app)/(tabs)/timetable",
-            params: semester ? { focusSemester: String(semester) } : {},
-          });
+          router.replace("/(app)/(tabs)/timetable");
         }}
       />
       )}

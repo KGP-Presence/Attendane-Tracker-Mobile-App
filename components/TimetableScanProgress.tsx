@@ -72,11 +72,12 @@ const ROW_INTERVAL_MS = 600;
 const AUDIO_LEAD_MS = 90;
 
 /**
- * How far the bar creeps while we wait on the scan. It decelerates toward this
- * point rather than parking at 100%, so it never claims to be finished early.
+ * The bar climbs steadily to 99% over 20s while the scan runs — about how long
+ * a scan takes — then the reveal carries it to 100%. It stops just short so it
+ * never claims to be done before the subjects are actually in.
  */
-const SCAN_CEILING = 0.72;
-const SCAN_CREEP_MS = 18000;
+const SCAN_CEILING = 0.99;
+const SCAN_CREEP_MS = 20000;
 
 /* ─── chunky button ───────────────────────────────────────────────────────── */
 
@@ -610,7 +611,7 @@ type Props = {
   phase: "scanning" | "reporting" | "error";
   data?: TimetableScanResponse;
   errorMessage?: string;
-  onViewTimetables: (semester?: number) => void;
+  onViewTimetables: () => void;
   onRetry: () => void;
   onDismiss: () => void;
 };
@@ -646,7 +647,7 @@ export const TimetableScanProgress = ({
     progress.value = 0;
     progress.value = withTiming(SCAN_CEILING, {
       duration: SCAN_CREEP_MS,
-      easing: Easing.out(Easing.cubic),
+      easing: Easing.linear,
     });
   }, [phase, progress]);
 
@@ -890,7 +891,7 @@ export const TimetableScanProgress = ({
               color={finished ? C.green : C.grey}
               edge={finished ? C.greenEdge : C.greyEdge}
               disabled={!finished}
-              onPress={() => onViewTimetables(data?.timetable?.semester)}
+              onPress={onViewTimetables}
             />
           )}
         </View>
