@@ -1,4 +1,11 @@
-import { useCreateTimetable, useCreateTimetableByImage } from "@/hooks/useCreateTimetable";
+import { TimetableScanProgress } from "@/components/TimetableScanProgress";
+import {
+  getUploadErrorMessage,
+  useCreateTimetable,
+  useCreateTimetableByImage,
+} from "@/hooks/useCreateTimetable";
+import { useScanFeedback } from "@/hooks/useScanFeedback";
+import { TimetableScanResponse } from "@/types/timetableScan";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { Camera, ChevronLeft, Info, X } from "lucide-react-native";
@@ -27,7 +34,36 @@ export default function CreateTimetable() {
   const [semester, setSemester] = useState("");
   const [image, setImage] = useState<string | null>(null);
   const { mutate: createTimetable, isPending: isCreatingTimetable } = useCreateTimetable();
-  const { mutate: createTimetableByImage, isPending: isCreatingTimetableByImage } = useCreateTimetableByImage();
+  const { mutateAsync: createTimetableByImage, isPending: isCreatingTimetableByImage } =
+    useCreateTimetableByImage();
+
+  // Loaded here rather than in the modal: this screen is mounted while the
+  // user fills in the form, so the clips are ready when the scan starts.
+  const feedback = useScanFeedback();
+
+  // Drives the full-screen progress report shown while the scan runs.
+  const [scanPhase, setScanPhase] = useState<"idle" | "scanning" | "reporting" | "error">("idle");
+  const [scanData, setScanData] = useState<TimetableScanResponse>();
+  const [scanError, setScanError] = useState<string>();
+  // Kept so "try again" can resend the identical upload without rebuilding it.
+  const [lastFormData, setLastFormData] = useState<FormData>();
+
+  const runScan = (formData: FormData) => {
+    setLastFormData(formData);
+    setScanData(undefined);
+    setScanError(undefined);
+    setScanPhase("scanning");
+
+    createTimetableByImage(formData)
+      .then((data) => {
+        setScanData(data);
+        setScanPhase("reporting");
+      })
+      .catch((error) => {
+        setScanError(getUploadErrorMessage(error));
+        setScanPhase("error");
+      });
+  };
 
   const pickImage = async () => {
     // Request permissions
@@ -84,7 +120,7 @@ export default function CreateTimetable() {
         type: type,
       } as unknown as Blob);
 
-      createTimetableByImage(formData);
+      runScan(formData);
     }
   };
 
@@ -94,6 +130,22 @@ export default function CreateTimetable() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#f6f6f8] dark:bg-[#101622]">
+      {scanPhase !== "idle" && (
+      <TimetableScanProgress
+        visible
+        phase={scanPhase}
+        data={scanData}
+        errorMessage={scanError}
+        feedback={feedback}
+        onDismiss={() => setScanPhase("idle")}
+        onRetry={() => lastFormData && runScan(lastFormData)}
+        onViewTimetables={() => {
+          setScanPhase("idle");
+          router.replace("/(app)/(tabs)/timetable");
+        }}
+      />
+      )}
+
       <StatusBar
         barStyle={isDark ? "light-content" : "dark-content"}
         backgroundColor={isDark ? "#101622" : "#f6f6f8"}
@@ -175,8 +227,8 @@ export default function CreateTimetable() {
 
           <View className="flex-row items-center gap-x-4 py-4">
             <View className="h-[1px] flex-1 bg-[#dbdfe6] dark:bg-white/10" />
-            <Text className="text-[10px] font-bold text-[#616f89] dark:text-white/40 uppercase">
-              OPTIONAL
+            <Text className="text-[10px] font-bold text-[#135bec] uppercase">
+              RECOMMENDED
             </Text>
             <View className="h-[1px] flex-1 bg-[#dbdfe6] dark:bg-white/10" />
           </View>
@@ -187,7 +239,8 @@ export default function CreateTimetable() {
               Auto-Create via Image
             </Text>
             <Text className="text-[#616f89] dark:text-white/60 text-sm mb-6">
-              Upload a clear photo of your timetable for AI extraction.
+              Upload a clear photo of your timetable and we&apos;ll build it for you —
+              subjects, slots and all.
             </Text>
 
             {image ? (
@@ -231,8 +284,9 @@ export default function CreateTimetable() {
           <View className="flex-row items-start gap-x-3 p-4 mt-6 rounded-xl bg-gray-100 dark:bg-[#1c2433] border border-[#dbdfe6] dark:border-white/10">
             <Info color="#135bec" size={20} />
             <Text className="flex-1 text-[#616f89] dark:text-white/60 text-xs leading-4">
-              Our AI will scan for course codes and time slots. You&apos;ll be able
-              to review everything before saving.
+              We read the slots straight off your timetable, so each subject gets
+              the classes you actually attend. Anything with a clash is skipped and
+              listed for you to add yourself.
             </Text>
           </View>
         </View>

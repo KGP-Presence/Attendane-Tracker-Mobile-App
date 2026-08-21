@@ -1,11 +1,12 @@
+import { PatternArt } from "@/components/PatternArt";
 import { TimetableCardType } from "@/types/timetableTypes";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import { Calendar, Edit2 } from "lucide-react-native";
-import React, { useMemo } from "react";
+import React from "react";
 import {
-  ImageBackground,
   Platform,
+  StyleSheet,
   Text,
   TouchableOpacity,
   Vibration,
@@ -35,10 +36,6 @@ export const TimetableCard = ({
 }: TimetableCardType) => {
   // const randomColor = React.useMemo(() => getRandomGradient(), []);
 
-  const imageUrl = useMemo(() => {
-    return `https://picsum.photos/seed/${_id}/400/200`;
-  }, [_id]);
-
   const handleCardPress = () => {
     if (Platform.OS === "android") {
       // Forces the motor to spin up and stop in exactly 5 milliseconds.
@@ -61,14 +58,11 @@ export const TimetableCard = ({
       className={`mb-4 overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm`}
       onPress={handleCardPress}
     >
-      <ImageBackground
-        source={{ uri: imageUrl }}
-        className="h-32 w-full justify-end"
-        resizeMode="cover"
-      >
+      <View className="h-32 w-full justify-end">
+        <PatternArt seed={_id} style={StyleSheet.absoluteFill} />
         {/* Optional: Add a subtle overlay to make text/icons pop if needed */}
         <View className="absolute inset-0 bg-black/10" />
-      </ImageBackground>
+      </View>
 
       <View className="p-4">
         <View className="flex-row justify-between items-start">

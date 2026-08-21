@@ -1,4 +1,5 @@
 import LoadingScreen from "@/components/Loading";
+import { PatternArt } from "@/components/PatternArt";
 import { useDeleteTimetable } from "@/hooks/useDeleteTimetable";
 import { useRemoveSubjectsFromTimetable } from "@/hooks/useEditTimetableSubjects";
 import { useGetTimetableById } from "@/hooks/useGetTimetableById";
@@ -10,10 +11,10 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
-  Image,
   Platform,
   ScrollView,
   StatusBar,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -192,12 +193,9 @@ export default function EditTimetable() {
       >
         {/* Banner Section */}
         <View className="rounded-2xl overflow-hidden relative h-40 mb-6 bg-slate-800">
-          <Image
-            source={{
-              uri: `https://picsum.photos/seed/${timetableData?._id}/400/200`,
-            }}
-            className="absolute inset-0 w-full h-full"
-            resizeMode="cover"
+          <PatternArt
+            seed={timetableData?._id ?? ""}
+            style={StyleSheet.absoluteFill}
           />
           <LinearGradient
             colors={["transparent", "rgba(0,0,0,0.8)"]}

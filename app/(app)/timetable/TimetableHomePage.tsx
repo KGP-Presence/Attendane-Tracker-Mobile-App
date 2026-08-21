@@ -31,7 +31,9 @@ export default function TimetableScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   
   // State for semester filtering
-  const [selectedSemester, setSelectedSemester] = useState<number | "All" | null>(null);
+  // "All" by default: auto-picking a semester silently hid every timetable
+  // from the others, which read as them disappearing.
+  const [selectedSemester, setSelectedSemester] = useState<number | "All" | null>("All");
   const [isFilterModalVisible, setFilterModalVisible] = useState(false);
 
   // Refs for Copilot spotlight
@@ -47,12 +49,6 @@ export default function TimetableScreen() {
     return [...new Set(semesters)].sort((a: unknown, b: unknown) => (b as number) - (a as number));
   }, [data]);
 
-  // Set the highest semester as default when data loads
-  useEffect(() => {
-    if (uniqueSemesters.length > 0 && selectedSemester === null) {
-      setSelectedSemester(uniqueSemesters[0] as number);
-    }
-  }, [uniqueSemesters, selectedSemester]);
 
   const filteredData = data?.filter((timetable: TimetableCardType) => {
     const matchesSearch = timetable.name.toLowerCase().includes(searchQuery.toLowerCase());

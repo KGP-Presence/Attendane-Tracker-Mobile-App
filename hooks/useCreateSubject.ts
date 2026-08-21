@@ -31,10 +31,22 @@ export const useCreateSubject = () => {
     },
     onError: (error) => {
       let message = "Failed to create subject";
-      
+
       if (axios.isAxiosError(error)) {
         // Extract the custom error message from your ApiError class on the backend
         message = error.response?.data?.message || error.message;
+
+        // A duplicate code isn't a real failure: the backend hands back the
+        // subject the student already owns and the caller reuses it.
+        if (error.response?.status === 409) {
+          Toast.show({
+            type: "info",
+            text1: "Subject already exists",
+            text2: "Using the one already in your list.",
+            position: "bottom",
+          });
+          return;
+        }
       }
 
       console.log("Subject creation error:", error);

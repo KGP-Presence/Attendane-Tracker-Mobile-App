@@ -1,3 +1,4 @@
+import { PatternArt } from "@/components/PatternArt";
 import { useEditProfile } from "@/hooks/useEditProfile";
 import { useMe } from "@/hooks/useMe";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -8,7 +9,6 @@ import React, { use, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Image,
   ScrollView,
   Text,
   TextInput,
@@ -31,6 +31,9 @@ export default function EditProfileScreen() {
 
   const { data: meData, isLoading } = useMe();
   const { mutate: updateProfile, isPending } = useEditProfile();
+
+  // Same seed the profile page uses, so both screens show the same artwork.
+  const avatarSeed = meData?._id ?? "";
 
   const [isDeptModalVisible, setIsDeptModalVisible] = useState(false);
 
@@ -137,9 +140,9 @@ export default function EditProfileScreen() {
         <View className="p-8 items-center">
           <View className="gap-4 items-center">
             <View className="relative">
-              <Image
-                source={{ uri: "https://picsum.photos/seed/123/400/200" }} // Replace with actual Google user profile pic URL
-                className="w-32 h-32 rounded-full border-4 border-primary/20"
+              <PatternArt
+                seed={avatarSeed}
+                className="w-32 h-32 overflow-hidden rounded-full border-4 border-primary/20"
               />
               <TouchableOpacity className="absolute bottom-0 right-0 bg-primary p-2 rounded-full shadow-lg">
                 <MaterialIcons name="photo-camera" size={20} color="white" />
