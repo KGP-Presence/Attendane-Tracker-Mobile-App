@@ -1,4 +1,4 @@
-import { useScanFeedback } from "@/hooks/useScanFeedback";
+import { ScanCue } from "@/hooks/useScanFeedback";
 import {
   formatSlot,
   ScanResult,
@@ -614,6 +614,8 @@ type Props = {
   phase: "scanning" | "reporting" | "error";
   data?: TimetableScanResponse;
   errorMessage?: string;
+  /** Preloaded on the parent screen so the clips are ready before the scan. */
+  feedback: (cue: ScanCue) => void;
   onViewTimetables: () => void;
   onRetry: () => void;
   onDismiss: () => void;
@@ -624,12 +626,12 @@ export const TimetableScanProgress = ({
   phase,
   data,
   errorMessage,
+  feedback,
   onViewTimetables,
   onRetry,
   onDismiss,
 }: Props) => {
   const isDark = useColorScheme() === "dark";
-  const feedback = useScanFeedback();
 
   // Stable identity: this feeds timer effects, and a fresh array every render
   // would restart them on any incidental re-render.

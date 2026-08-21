@@ -4,6 +4,7 @@ import {
   useCreateTimetable,
   useCreateTimetableByImage,
 } from "@/hooks/useCreateTimetable";
+import { useScanFeedback } from "@/hooks/useScanFeedback";
 import { TimetableScanResponse } from "@/types/timetableScan";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
@@ -35,6 +36,10 @@ export default function CreateTimetable() {
   const { mutate: createTimetable, isPending: isCreatingTimetable } = useCreateTimetable();
   const { mutateAsync: createTimetableByImage, isPending: isCreatingTimetableByImage } =
     useCreateTimetableByImage();
+
+  // Loaded here rather than in the modal: this screen is mounted while the
+  // user fills in the form, so the clips are ready when the scan starts.
+  const feedback = useScanFeedback();
 
   // Drives the full-screen progress report shown while the scan runs.
   const [scanPhase, setScanPhase] = useState<"idle" | "scanning" | "reporting" | "error">("idle");
@@ -131,6 +136,7 @@ export default function CreateTimetable() {
         phase={scanPhase}
         data={scanData}
         errorMessage={scanError}
+        feedback={feedback}
         onDismiss={() => setScanPhase("idle")}
         onRetry={() => lastFormData && runScan(lastFormData)}
         onViewTimetables={() => {
