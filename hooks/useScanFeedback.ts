@@ -20,11 +20,14 @@ const CLIPS = {
 
 export type ScanCue = keyof typeof CLIPS;
 
+// Clips are normalised to ~0.9 peak, so these are close to full scale. The
+// earlier values put the scanning tick at 0.06 of full scale, which on a phone
+// speaker is inaudible.
 const VOLUMES: Record<ScanCue, number> = {
-  scan: 0.3,
-  pop: 0.55,
-  skip: 0.55,
-  complete: 0.8,
+  scan: 0.55,
+  pop: 1,
+  skip: 1,
+  complete: 1,
 };
 
 /**
@@ -100,6 +103,10 @@ export const useScanFeedback = () => {
           console.warn(`[scan] could not load ${key}:`, error);
         }
       }
+
+      console.log(
+        `[scan] cues ready: ${Object.keys(sounds.current).join(", ") || "none"}`,
+      );
     })();
 
     return () => {
@@ -118,7 +125,16 @@ export const useScanFeedback = () => {
 
     const sound = sounds.current[cue];
     if (!sound || !enabled.current) return;
-    // replayAsync rewinds first, so rapid repeats don't get swallowed.
-    sound.replayAsync().catch(() => {});
+
+    // replayAsync rewinds first, so rapid repeats don't get swallowed. If the
+    // player refuses it, seek-and-play rather than falling silent.
+    sound.replayAsync().catch(async () => {
+      try {
+        await sound.setPositionAsync(0);
+        await sound.playAsync();
+      } catch (error) {
+        console.warn(`[scan] could not play ${cue}:`, error);
+      }
+    });
   }, []);
 };
