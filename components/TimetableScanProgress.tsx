@@ -581,7 +581,7 @@ type Props = {
   phase: "scanning" | "reporting" | "error";
   data?: TimetableScanResponse;
   errorMessage?: string;
-  onViewTimetable: (timetableId: string) => void;
+  onViewTimetables: () => void;
   onCreateManually: (skipped: ScanResult[], timetableId: string) => void;
   onRetry: () => void;
   onDismiss: () => void;
@@ -592,7 +592,7 @@ export const TimetableScanProgress = ({
   phase,
   data,
   errorMessage,
-  onViewTimetable,
+  onViewTimetables,
   onCreateManually,
   onRetry,
   onDismiss,
@@ -841,7 +841,7 @@ export const TimetableScanProgress = ({
                 />
               )}
               <ChunkyButton
-                label={finished ? "SEE MY TIMETABLE" : "HANG TIGHT…"}
+                label={finished ? "SEE MY TIMETABLES" : "HANG TIGHT…"}
                 color={
                   finished ? (skipped.length ? C.grey : C.green) : C.grey
                 }
@@ -853,7 +853,7 @@ export const TimetableScanProgress = ({
                     : C.greyEdge
                 }
                 disabled={!finished}
-                onPress={() => onViewTimetable(timetableId)}
+                onPress={onViewTimetables}
               />
             </>
           )}

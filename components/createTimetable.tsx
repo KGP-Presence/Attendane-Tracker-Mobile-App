@@ -132,9 +132,11 @@ export default function CreateTimetable() {
         errorMessage={scanError}
         onDismiss={() => setScanPhase("idle")}
         onRetry={() => lastFormData && runScan(lastFormData)}
-        onViewTimetable={(timetableId) => {
+        onViewTimetables={() => {
           setScanPhase("idle");
-          router.replace({ pathname: "/timetable/[id]", params: { id: timetableId } });
+          // Land on the My Timetables list, not the single timetable's detail
+          // page — the new one is right at the top of it.
+          router.replace("/(app)/(tabs)/timetable");
         }}
         onCreateManually={(skipped, timetableId) => {
           setScanPhase("idle");
