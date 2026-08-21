@@ -63,8 +63,13 @@ const SCANNING_MESSAGES = [
   "Checking the rooms",
 ];
 
-/** Gap between subject cards landing. */
-const ROW_INTERVAL_MS = 380;
+/** Gap between subject cards landing. Paced to the length of the cue that
+ *  plays with each one, so the sound and the card land together. */
+const ROW_INTERVAL_MS = 600;
+
+/** Playing a clip costs a JS->native round trip, so the cue is fired slightly
+ *  ahead of the card's animation to make the two coincide. */
+const AUDIO_LEAD_MS = 90;
 
 /**
  * How far the bar creeps while we wait on the scan. It decelerates toward this
@@ -399,14 +404,15 @@ const ResultRow = React.memo(
     const delay = index * ROW_INTERVAL_MS;
 
     useEffect(() => {
+      // Heavier spring: the card takes ~300ms to settle, matching the cue.
       pop.value = withDelay(
         delay,
-        withSpring(1, { damping: 14, stiffness: 210, mass: 0.6 }),
+        withSpring(1, { damping: 15, stiffness: 170, mass: 0.85 }),
       );
       // Badge lands a beat after the card, so the tick reads as a reaction.
       badge.value = withDelay(
-        delay + 110,
-        withSpring(1, { damping: 9, stiffness: 280 }),
+        delay + 150,
+        withSpring(1, { damping: 9, stiffness: 260 }),
       );
     }, [pop, badge, delay]);
 
@@ -547,7 +553,7 @@ const CountUp = ({ to, color }: { to: number; color: string }) => {
   );
 };
 
-const TrophyBadge = ({ tone }: { tone: "win" | "warn" }) => {
+const TrophyBadge = () => {
   const pop = useSharedValue(0);
   const shine = useSharedValue(0);
 
@@ -580,9 +586,9 @@ const TrophyBadge = ({ tone }: { tone: "win" | "warn" }) => {
       style={[
         style,
         {
-          backgroundColor: tone === "win" ? C.green : C.amber,
+          backgroundColor: C.green,
           borderBottomWidth: 6,
-          borderBottomColor: tone === "win" ? C.greenEdge : C.amberEdge,
+          borderBottomColor: C.greenEdge,
         },
       ]}
       className="w-24 h-24 rounded-full items-center justify-center overflow-hidden"
@@ -592,11 +598,7 @@ const TrophyBadge = ({ tone }: { tone: "win" | "warn" }) => {
         className="absolute w-6 h-40 bg-white"
         pointerEvents="none"
       />
-      <Ionicons
-        name={tone === "win" ? "trophy" : "construct"}
-        size={46}
-        color="white"
-      />
+      <Ionicons name="trophy" size={46} color="white" />
     </Animated.View>
   );
 };
@@ -609,7 +611,6 @@ type Props = {
   data?: TimetableScanResponse;
   errorMessage?: string;
   onViewTimetables: () => void;
-  onCreateManually: (skipped: ScanResult[], timetableId: string) => void;
   onRetry: () => void;
   onDismiss: () => void;
 };
@@ -620,7 +621,6 @@ export const TimetableScanProgress = ({
   data,
   errorMessage,
   onViewTimetables,
-  onCreateManually,
   onRetry,
   onDismiss,
 }: Props) => {
@@ -671,7 +671,7 @@ export const TimetableScanProgress = ({
     const timers = results.map((result, i) =>
       setTimeout(
         () => feedback(result.status === "skipped" ? "skip" : "pop"),
-        i * ROW_INTERVAL_MS,
+        Math.max(0, i * ROW_INTERVAL_MS - AUDIO_LEAD_MS),
       ),
     );
     const done = setTimeout(() => {
@@ -710,8 +710,9 @@ export const TimetableScanProgress = ({
   const added = results.filter((r) => r.status === "created").length;
   const updated = results.filter((r) => r.status === "updated").length;
   const reused = results.filter((r) => r.status === "reused").length;
-  const timetableId = data?.timetable?._id ?? "";
-  const allGood = finished && skipped.length === 0 && results.length > 0;
+  // The timetable is created either way — a clash only means a subject was
+  // left off it — so the finish always reads as a success.
+  const scannedAnything = results.length > 0;
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onDismiss}>
@@ -766,13 +767,17 @@ export const TimetableScanProgress = ({
             <>
               {finished ? (
                 <View className="items-center pt-4 pb-2">
-                  <View className="h-28 items-center justify-center">
-                    {allGood && <Confetti />}
-                    <TrophyBadge tone={skipped.length ? "warn" : "win"} />
-                  </View>
-                  <Text className="text-3xl font-extrabold text-slate-900 dark:text-white mt-5 text-center">
-                    {skipped.length ? "Almost there!" : "Timetable ready!"}
-                  </Text>
+                  {scannedAnything && (
+                    <>
+                      <View className="h-28 items-center justify-center">
+                        <Confetti />
+                        <TrophyBadge />
+                      </View>
+                      <Text className="text-3xl font-extrabold text-slate-900 dark:text-white mt-5 text-center">
+                        Timetable ready!
+                      </Text>
+                    </>
+                  )}
 
                   <View className="flex-row justify-center mt-4 gap-2">
                     {[
@@ -847,12 +852,13 @@ export const TimetableScanProgress = ({
                   <View className="flex-row items-center mb-2">
                     <Ionicons name="alert-circle" size={20} color={C.amber} />
                     <Text className="text-sm font-extrabold text-[#E08600] ml-2">
-                      {skipped.length} left out
+                      {skipped.length} subject{skipped.length === 1 ? "" : "s"} not added
                     </Text>
                   </View>
                   <Text className="text-xs font-medium text-[#B36B00] dark:text-amber-300 leading-4">
-                    Their slots clash, so we didn&apos;t guess. Add them yourself
-                    and pick the slots you actually attend.
+                    Your timetable was created without them. Their slots clash with
+                    each other, so we left them out rather than guess which one you
+                    actually attend.
                   </Text>
                 </LinearGradient>
               )}
@@ -879,30 +885,13 @@ export const TimetableScanProgress = ({
               />
             </>
           ) : (
-            <>
-              {finished && skipped.length > 0 && (
-                <ChunkyButton
-                  label="ADD THE REST"
-                  icon="add-circle"
-                  color={C.amber}
-                  edge={C.amberEdge}
-                  onPress={() => onCreateManually(skipped, timetableId)}
-                />
-              )}
-              <ChunkyButton
-                label={finished ? "SEE MY TIMETABLES" : "HANG TIGHT…"}
-                color={finished ? (skipped.length ? C.grey : C.green) : C.grey}
-                edge={
-                  finished
-                    ? skipped.length
-                      ? C.greyEdge
-                      : C.greenEdge
-                    : C.greyEdge
-                }
-                disabled={!finished}
-                onPress={onViewTimetables}
-              />
-            </>
+            <ChunkyButton
+              label={finished ? "SEE MY TIMETABLES" : "HANG TIGHT…"}
+              color={finished ? C.green : C.grey}
+              edge={finished ? C.greenEdge : C.greyEdge}
+              disabled={!finished}
+              onPress={onViewTimetables}
+            />
           )}
         </View>
       </SafeAreaView>

@@ -139,24 +139,6 @@ export default function CreateTimetable() {
           // page — the new one is right at the top of it.
           router.replace("/(app)/(tabs)/timetable");
         }}
-        onCreateManually={(skipped, timetableId) => {
-          setScanPhase("idle");
-          // Codes stay a plain comma list for the batch form; the venues we
-          // read off the image ride along as a code -> venues map, since
-          // route params have to be strings.
-          router.replace({
-            pathname: "/(app)/subject/create",
-            params: {
-              batchCodes: skipped.map((result) => result.code).join(","),
-              batchVenues: JSON.stringify(
-                Object.fromEntries(
-                  skipped.map((result) => [result.code, result.venues ?? []]),
-                ),
-              ),
-              timetableId,
-            },
-          });
-        }}
       />
       )}
 

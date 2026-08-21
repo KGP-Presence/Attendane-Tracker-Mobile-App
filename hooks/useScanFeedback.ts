@@ -55,6 +55,15 @@ export const useScanFeedback = () => {
             await sound.unloadAsync();
             return;
           }
+
+          // First playback of a clip is noticeably slower than the rest, which
+          // would put the opening cue behind its card. Run one silent pass so
+          // the native player is ready before the reveal starts.
+          await sound.setVolumeAsync(0);
+          await sound.playAsync();
+          await sound.stopAsync();
+          await sound.setVolumeAsync(key === "complete" ? 0.8 : 0.55);
+
           sounds.current[key] = sound;
         }
       } catch (error) {
