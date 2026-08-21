@@ -15,6 +15,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
   Platform,
   ScrollView,
   StatusBar,
@@ -45,6 +46,8 @@ export default function CreateTimetable() {
   const [scanPhase, setScanPhase] = useState<"idle" | "scanning" | "reporting" | "error">("idle");
   const [scanData, setScanData] = useState<TimetableScanResponse>();
   const [scanError, setScanError] = useState<string>();
+  const [isUploadFlowOpen, setIsUploadFlowOpen] = useState(false);
+  const [isImagePreviewOpen, setIsImagePreviewOpen] = useState(false);
   // Kept so "try again" can resend the identical upload without rebuilding it.
   const [lastFormData, setLastFormData] = useState<FormData>();
 
@@ -65,7 +68,7 @@ export default function CreateTimetable() {
       });
   };
 
-  const pickImage = async () => {
+  const openGalleryPicker = async () => {
     // Request permissions
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
@@ -80,13 +83,32 @@ export default function CreateTimetable() {
     // Launch gallery
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"], // Updated: Using array of strings/MediaTypes
-      allowsEditing: true,
+      allowsEditing: false,
       quality: 1,
     });
 
     if (!result.canceled) {
       setImage(result.assets[0].uri);
     }
+  };
+
+  const startUploadFlow = () => {
+    if (Platform.OS === "android") {
+      Vibration.vibrate(20);
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    setIsUploadFlowOpen(true);
+  };
+
+  const continueUploadFlow = async () => {
+    setIsUploadFlowOpen(false);
+    await openGalleryPicker();
+  };
+
+  const handleReplaceImage = async () => {
+    setIsImagePreviewOpen(false);
+    await openGalleryPicker();
   };
 
   const removeImage = () => setImage(null);
@@ -150,6 +172,102 @@ export default function CreateTimetable() {
         barStyle={isDark ? "light-content" : "dark-content"}
         backgroundColor={isDark ? "#101622" : "#f6f6f8"}
       />
+
+      <Modal
+        transparent
+        visible={isUploadFlowOpen}
+        animationType="fade"
+        onRequestClose={() => setIsUploadFlowOpen(false)}
+      >
+        <View className="flex-1 bg-black/55 justify-end">
+          <View className="bg-white dark:bg-[#101622] rounded-t-3xl px-5 pt-5 pb-8 border-t border-[#dbdfe6] dark:border-white/10">
+            <View className="flex-row items-center justify-between mb-3">
+              <Text className="text-[#111318] dark:text-white text-lg font-bold">
+                Upload Timetable
+              </Text>
+              <TouchableOpacity
+                onPress={() => setIsUploadFlowOpen(false)}
+                className="h-8 w-8 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800"
+              >
+                <X size={16} color={isDark ? "#cbd5e1" : "#475569"} />
+              </TouchableOpacity>
+            </View>
+
+            <Text className="text-[#616f89] dark:text-white/60 text-sm leading-5 mb-4">
+              Pick a clear timetable image. We will scan subjects and slots, then you can continue to create your timetable.
+            </Text>
+
+            <View className="rounded-2xl border border-[#dbdfe6] dark:border-white/10 bg-[#f8faff] dark:bg-[#1c2433] p-4 mb-4">
+              <Text className="text-[#135bec] dark:text-blue-300 text-xs font-bold uppercase tracking-widest mb-2">
+                Best Results
+              </Text>
+              <Text className="text-[#334155] dark:text-white/80 text-sm">1. Keep all rows and columns visible.</Text>
+              <Text className="text-[#334155] dark:text-white/80 text-sm mt-1">2. Avoid blur, glare, and shadows.</Text>
+              <Text className="text-[#334155] dark:text-white/80 text-sm mt-1">3. Use screenshots or high-resolution photos.</Text>
+            </View>
+
+            <View className="flex-row gap-3">
+              <TouchableOpacity
+                className="flex-1 h-12 rounded-xl border border-[#dbdfe6] dark:border-white/10 items-center justify-center bg-white dark:bg-[#1c2433]"
+                onPress={() => setIsUploadFlowOpen(false)}
+              >
+                <Text className="text-[#334155] dark:text-white/80 font-semibold">Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                className="flex-1 h-12 rounded-xl items-center justify-center bg-[#135bec]"
+                onPress={continueUploadFlow}
+              >
+                <Text className="text-white font-bold">Continue</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        transparent
+        visible={isImagePreviewOpen}
+        animationType="fade"
+        onRequestClose={() => setIsImagePreviewOpen(false)}
+      >
+        <View className="flex-1 bg-black/90">
+          <View className="px-4 pt-5 pb-2 flex-row items-center justify-between">
+            <Text className="text-white text-base font-bold">Image Preview</Text>
+            <TouchableOpacity
+              onPress={() => setIsImagePreviewOpen(false)}
+              className="h-8 w-8 rounded-full items-center justify-center bg-white/15"
+            >
+              <X color="white" size={16} />
+            </TouchableOpacity>
+          </View>
+
+          <View className="flex-1 items-center justify-center px-4">
+            {image && (
+              <Image
+                source={{ uri: image }}
+                className="w-full h-full"
+                resizeMode="contain"
+              />
+            )}
+          </View>
+
+          <View className="p-4 flex-row gap-3">
+            <TouchableOpacity
+              className="flex-1 h-12 rounded-xl border border-white/30 items-center justify-center"
+              onPress={handleReplaceImage}
+            >
+              <Text className="text-white font-semibold">Replace Photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="flex-1 h-12 rounded-xl bg-[#135bec] items-center justify-center"
+              onPress={() => setIsImagePreviewOpen(false)}
+            >
+              <Text className="text-white font-bold">Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Header */}
       <View className="flex-row items-center justify-between px-4 py-4 bg-white dark:bg-[#101622] border-b border-[#dbdfe6] dark:border-white/10">
@@ -245,21 +363,30 @@ export default function CreateTimetable() {
 
             {image ? (
               <View className="relative w-full aspect-video rounded-2xl overflow-hidden border border-[#dbdfe6] dark:border-white/10">
-                <Image
-                  source={{ uri: image }}
+                <TouchableOpacity
+                  activeOpacity={0.9}
                   className="w-full h-full"
-                  resizeMode="cover"
-                />
+                  onPress={() => setIsImagePreviewOpen(true)}
+                >
+                  <Image
+                    source={{ uri: image }}
+                    className="w-full h-full"
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
                 <TouchableOpacity
                   onPress={removeImage}
                   className="absolute top-2 right-2 bg-black/50 p-2 rounded-full"
                 >
                   <X color="white" size={20} />
                 </TouchableOpacity>
+                <View className="absolute bottom-2 left-2 bg-black/55 px-2.5 py-1 rounded-full">
+                  <Text className="text-white text-[11px] font-semibold">Tap to view</Text>
+                </View>
               </View>
             ) : (
               <TouchableOpacity
-                onPress={pickImage}
+                onPress={startUploadFlow}
                 activeOpacity={0.7}
                 className="items-center justify-center rounded-2xl border-2 border-dashed border-[#135bec]/30 bg-[#135bec]/5 dark:bg-[#135bec]/10 py-10"
               >
@@ -307,7 +434,7 @@ export default function CreateTimetable() {
             <ActivityIndicator color="white" />
           ) : (
             <Text className="text-white font-bold text-base">
-              {image ? "Upload & Create" : "Proceed to Add Subjects"}
+              {image ? "Continue to Create Timetable" : "Proceed to Add Subjects"}
             </Text>
           )}
         </TouchableOpacity>
