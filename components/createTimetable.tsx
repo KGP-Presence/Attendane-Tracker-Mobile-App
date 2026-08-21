@@ -40,6 +40,25 @@ export default function CreateTimetable() {
   const [scanPhase, setScanPhase] = useState<"idle" | "scanning" | "reporting" | "error">("idle");
   const [scanData, setScanData] = useState<TimetableScanResponse>();
   const [scanError, setScanError] = useState<string>();
+  // Kept so "try again" can resend the identical upload without rebuilding it.
+  const [lastFormData, setLastFormData] = useState<FormData>();
+
+  const runScan = (formData: FormData) => {
+    setLastFormData(formData);
+    setScanData(undefined);
+    setScanError(undefined);
+    setScanPhase("scanning");
+
+    createTimetableByImage(formData)
+      .then((data) => {
+        setScanData(data);
+        setScanPhase("reporting");
+      })
+      .catch((error) => {
+        setScanError(getUploadErrorMessage(error));
+        setScanPhase("error");
+      });
+  };
 
   const pickImage = async () => {
     // Request permissions
@@ -96,19 +115,7 @@ export default function CreateTimetable() {
         type: type,
       } as unknown as Blob);
 
-      setScanData(undefined);
-      setScanError(undefined);
-      setScanPhase("scanning");
-
-      createTimetableByImage(formData)
-        .then((data) => {
-          setScanData(data);
-          setScanPhase("reporting");
-        })
-        .catch((error) => {
-          setScanError(getUploadErrorMessage(error));
-          setScanPhase("error");
-        });
+      runScan(formData);
     }
   };
 
@@ -124,6 +131,7 @@ export default function CreateTimetable() {
         data={scanData}
         errorMessage={scanError}
         onDismiss={() => setScanPhase("idle")}
+        onRetry={() => lastFormData && runScan(lastFormData)}
         onViewTimetable={(timetableId) => {
           setScanPhase("idle");
           router.replace({ pathname: "/timetable/[id]", params: { id: timetableId } });

@@ -583,6 +583,7 @@ type Props = {
   errorMessage?: string;
   onViewTimetable: (timetableId: string) => void;
   onCreateManually: (skipped: ScanResult[], timetableId: string) => void;
+  onRetry: () => void;
   onDismiss: () => void;
 };
 
@@ -593,6 +594,7 @@ export const TimetableScanProgress = ({
   errorMessage,
   onViewTimetable,
   onCreateManually,
+  onRetry,
   onDismiss,
 }: Props) => {
   const isDark = useColorScheme() === "dark";
@@ -698,7 +700,7 @@ export const TimetableScanProgress = ({
                 <ProgressBar value={0} indeterminate />
               </View>
               <Text className="text-xs font-semibold text-slate-400 dark:text-slate-500 text-center mt-4">
-                This takes a few seconds
+                Hang tight — this can take up to a minute
               </Text>
             </View>
           )}
@@ -812,12 +814,21 @@ export const TimetableScanProgress = ({
         {/* ── actions ── */}
         <View className="px-5 pb-5 pt-3 gap-3 bg-[#f6f6f8] dark:bg-[#101622]">
           {phase === "error" ? (
-            <ChunkyButton
-              label="GO BACK"
-              color={C.brand}
-              edge={C.brandEdge}
-              onPress={onDismiss}
-            />
+            <>
+              <ChunkyButton
+                label="TRY AGAIN"
+                icon="refresh"
+                color={C.brand}
+                edge={C.brandEdge}
+                onPress={onRetry}
+              />
+              <ChunkyButton
+                label="GO BACK"
+                color={C.grey}
+                edge={C.greyEdge}
+                onPress={onDismiss}
+              />
+            </>
           ) : (
             <>
               {finished && skipped.length > 0 && (

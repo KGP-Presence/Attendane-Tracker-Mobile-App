@@ -287,6 +287,9 @@ export const timetableApi = {
       headers: {
         "Content-Type": "multipart/form-data",
       },
+      // The scan retries a congested Gemini server-side, so this has to outlast
+      // the backend's own deadline rather than cutting it off mid-retry.
+      timeout: 60000,
     });
     return response.data.data;
   },
