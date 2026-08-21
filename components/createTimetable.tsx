@@ -125,9 +125,10 @@ export default function CreateTimetable() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#f6f6f8] dark:bg-[#101622]">
+      {scanPhase !== "idle" && (
       <TimetableScanProgress
-        visible={scanPhase !== "idle"}
-        phase={scanPhase === "idle" ? "scanning" : scanPhase}
+        visible
+        phase={scanPhase}
         data={scanData}
         errorMessage={scanError}
         onDismiss={() => setScanPhase("idle")}
@@ -157,6 +158,7 @@ export default function CreateTimetable() {
           });
         }}
       />
+      )}
 
       <StatusBar
         barStyle={isDark ? "light-content" : "dark-content"}
