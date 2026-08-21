@@ -14,36 +14,42 @@ import { Vibration } from "react-native";
  */
 
 const CLIPS = {
-  scan: require("@/assets/sounds/scan/scan.wav"),
   pop: require("@/assets/sounds/scan/pop.wav"),
   skip: require("@/assets/sounds/scan/skip.wav"),
   complete: require("@/assets/sounds/scan/complete.wav"),
 };
 
+/** Continuous sweep played under the scanning phase, not a one-shot. */
+const AMBIENT = require("@/assets/sounds/scan/scanloop.wav");
+const AMBIENT_VOLUME = 0.45;
+
 export type ScanCue = keyof typeof CLIPS;
 
-// Clips are normalised to ~0.9 peak, so these sit close to full scale. The
-// repeating scan tick is held back since it fires every 1.6s.
+// Clips are normalised to ~0.9 peak, so these sit close to full scale.
 const VOLUMES: Record<ScanCue, number> = {
-  scan: 0.55,
   pop: 1,
   skip: 1,
   complete: 1,
 };
 
-/**
- * Vibration patterns, kept short so a long report doesn't buzz constantly.
- * `scan` repeats while waiting, so it stays silent on the motor — a 20s buzz
- * would be maddening.
- */
-const PATTERNS: Partial<Record<ScanCue, number | number[]>> = {
+/** Vibration patterns, kept short so a long report doesn't buzz constantly. */
+const PATTERNS: Record<ScanCue, number | number[]> = {
   pop: 12,
   skip: [0, 22, 45, 22],
   complete: [0, 30, 55, 30, 55, 60],
 };
 
-export const useScanFeedback = () => {
+export type ScanFeedback = {
+  /** Fire a one-shot cue. */
+  cue: (cue: ScanCue) => void;
+  /** Start or stop the continuous scanning sweep. */
+  setAmbient: (on: boolean) => void;
+};
+
+export const useScanFeedback = (): ScanFeedback => {
   const sounds = useRef<Partial<Record<ScanCue, Audio.Sound>>>({});
+  const ambient = useRef<Audio.Sound | null>(null);
+  const ambientWanted = useRef(false);
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -68,31 +74,51 @@ export const useScanFeedback = () => {
           const { sound } = await Audio.Sound.createAsync(CLIPS[key], {
             volume: VOLUMES[key],
           });
-
           if (!mounted.current) {
             await sound.unloadAsync().catch(() => {});
             return;
           }
-
-          // Register before anything else can throw.
           sounds.current[key] = sound;
         } catch (error) {
           console.warn(`[scan] could not load ${key}:`, error);
         }
       }
 
+      try {
+        const { sound } = await Audio.Sound.createAsync(AMBIENT, {
+          volume: AMBIENT_VOLUME,
+          isLooping: true,
+        });
+        if (!mounted.current) {
+          await sound.unloadAsync().catch(() => {});
+          return;
+        }
+        ambient.current = sound;
+        // The scan may already have started while this was loading.
+        if (ambientWanted.current) await sound.playAsync();
+      } catch (error) {
+        console.warn("[scan] could not load ambient:", error);
+      }
+
       console.log(
-        `[scan] cues ready: ${Object.keys(sounds.current).join(", ") || "none"}`,
+        `[scan] cues ready: ${Object.keys(sounds.current).join(", ") || "none"}` +
+          `${ambient.current ? " + ambient" : " (no ambient)"}`,
       );
     })();
 
     return () => {
       mounted.current = false;
+      ambientWanted.current = false;
+
       const loaded = sounds.current;
       sounds.current = {};
       Object.values(loaded).forEach((sound) => {
         sound?.unloadAsync().catch(() => {});
       });
+
+      const loop = ambient.current;
+      ambient.current = null;
+      loop?.unloadAsync().catch(() => {});
     };
   }, []);
 
@@ -113,23 +139,34 @@ export const useScanFeedback = () => {
     }
   }, []);
 
-  return useCallback(
-    (cue: ScanCue) => {
-      const pattern = PATTERNS[cue];
-      if (pattern !== undefined) Vibration.vibrate(pattern);
+  const cue = useCallback(
+    (which: ScanCue) => {
+      Vibration.vibrate(PATTERNS[which]);
 
-      const sound = sounds.current[cue];
+      const sound = sounds.current[which];
 
       // Preloading may not have finished yet, so fall back rather than
       // silently dropping the cue.
       if (!sound) {
-        playOnDemand(cue);
+        playOnDemand(which);
         return;
       }
 
       // replayAsync rewinds first, so rapid repeats don't get swallowed.
-      sound.replayAsync().catch(() => playOnDemand(cue));
+      sound.replayAsync().catch(() => playOnDemand(which));
     },
     [playOnDemand],
   );
+
+  const setAmbient = useCallback((on: boolean) => {
+    ambientWanted.current = on;
+
+    const loop = ambient.current;
+    if (!loop) return; // still loading; the loader will start it if wanted
+
+    if (on) loop.playAsync().catch(() => {});
+    else loop.stopAsync().catch(() => {});
+  }, []);
+
+  return { cue, setAmbient };
 };
