@@ -1,26 +1,29 @@
+import { useScanFeedback } from "@/hooks/useScanFeedback";
 import {
   formatSlot,
   ScanResult,
   TimetableScanResponse,
 } from "@/types/timetableScan";
 import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { cssInterop } from "nativewind";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   useColorScheme,
   Vibration,
   View,
 } from "react-native";
 import Animated, {
+  cancelAnimation,
   Easing,
   interpolate,
+  SharedValue,
+  useAnimatedProps,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -33,9 +36,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 cssInterop(LinearGradient, { className: { target: "style" } });
 
-/* ─── palette ──────────────────────────────────────────────────────────────
-   Saturated fills with a darker "edge" underneath — the chunky, tactile look
-   the rest of this screen is built on. */
+/** Animated text without React re-renders: the value is written on the UI thread. */
+const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
+
+/* ─── palette ─────────────────────────────────────────────────────────────── */
+
 const C = {
   green: "#58CC02",
   greenEdge: "#46A302",
@@ -58,18 +63,15 @@ const SCANNING_MESSAGES = [
   "Checking the rooms",
 ];
 
-/** How long each subject card stays on screen before the next pops in. */
-const ROW_INTERVAL_MS = 420;
+/** Gap between subject cards landing. */
+const ROW_INTERVAL_MS = 380;
 
-const tick = (strong = false) => {
-  if (Platform.OS === "android") Vibration.vibrate(strong ? 18 : 8);
-  else
-    Haptics.impactAsync(
-      strong
-        ? Haptics.ImpactFeedbackStyle.Medium
-        : Haptics.ImpactFeedbackStyle.Light,
-    );
-};
+/**
+ * How far the bar creeps while we wait on the scan. It decelerates toward this
+ * point rather than parking at 100%, so it never claims to be finished early.
+ */
+const SCAN_CEILING = 0.72;
+const SCAN_CREEP_MS = 18000;
 
 /* ─── chunky button ───────────────────────────────────────────────────────── */
 
@@ -77,7 +79,6 @@ const ChunkyButton = ({
   label,
   color,
   edge,
-  textColor = "white",
   onPress,
   disabled,
   icon,
@@ -85,7 +86,6 @@ const ChunkyButton = ({
   label: string;
   color: string;
   edge: string;
-  textColor?: string;
   onPress: () => void;
   disabled?: boolean;
   icon?: keyof typeof Ionicons.glyphMap;
@@ -102,18 +102,20 @@ const ChunkyButton = ({
     <Pressable
       disabled={disabled}
       onPressIn={() => {
-        press.value = withTiming(1, { duration: 60 });
+        press.value = withTiming(1, { duration: 55 });
       }}
       onPressOut={() => {
-        press.value = withSpring(0, { damping: 14, stiffness: 320 });
+        press.value = withSpring(0, { damping: 13, stiffness: 340 });
       }}
       onPress={() => {
-        tick(true);
+        Vibration.vibrate(15);
         onPress();
       }}
       style={{ opacity: disabled ? 0.45 : 1 }}
     >
-      <View style={{ backgroundColor: edge, borderRadius: 16, paddingBottom: 4 }}>
+      <View
+        style={{ backgroundColor: edge, borderRadius: 16, paddingBottom: 4 }}
+      >
         <Animated.View
           style={[{ backgroundColor: color, borderRadius: 16 }, faceStyle]}
           className="h-14 items-center justify-center flex-row"
@@ -122,14 +124,11 @@ const ChunkyButton = ({
             <Ionicons
               name={icon}
               size={20}
-              color={textColor}
+              color="white"
               style={{ marginRight: 8 }}
             />
           ) : null}
-          <Text
-            style={{ color: textColor }}
-            className="font-extrabold text-base tracking-wide"
-          >
+          <Text className="text-white font-extrabold text-base tracking-wide">
             {label}
           </Text>
         </Animated.View>
@@ -141,33 +140,35 @@ const ChunkyButton = ({
 /* ─── confetti ────────────────────────────────────────────────────────────── */
 
 const PIECE_COLORS = [C.green, C.blue, C.amber, C.brand, "#FFC800", "#CE82FF"];
+const PIECE_COUNT = 14;
 
-const ConfettiPiece = ({ index }: { index: number }) => {
+const ConfettiPiece = React.memo(({ index }: { index: number }) => {
   const t = useSharedValue(0);
 
   // Deterministic spread so the burst looks designed rather than random noise.
-  const angle = (index / 18) * Math.PI * 2;
-  const distance = 90 + (index % 5) * 26;
+  const angle = (index / PIECE_COUNT) * Math.PI * 2;
+  const distance = 95 + (index % 4) * 28;
   const dx = Math.cos(angle) * distance;
-  const dy = Math.sin(angle) * distance * 0.7;
+  const dy = Math.sin(angle) * distance * 0.65;
+  const spin = index % 2 ? 460 : -380;
   const color = PIECE_COLORS[index % PIECE_COLORS.length];
   const isCircle = index % 3 === 0;
 
   useEffect(() => {
     t.value = withDelay(
-      index * 18,
-      withTiming(1, { duration: 1100, easing: Easing.out(Easing.cubic) }),
+      index * 16,
+      withTiming(1, { duration: 1150, easing: Easing.out(Easing.cubic) }),
     );
   }, [t, index]);
 
   const style = useAnimatedStyle(() => ({
-    opacity: interpolate(t.value, [0, 0.15, 0.75, 1], [0, 1, 1, 0]),
+    opacity: interpolate(t.value, [0, 0.12, 0.7, 1], [0, 1, 1, 0]),
     transform: [
       { translateX: t.value * dx },
-      // Arc outward, then let gravity take it down.
-      { translateY: t.value * dy + interpolate(t.value, [0, 1], [0, 160]) },
-      { rotate: `${t.value * (index % 2 ? 540 : -420)}deg` },
-      { scale: interpolate(t.value, [0, 0.2, 1], [0.4, 1, 0.7]) },
+      // Arc outward, then let gravity take over.
+      { translateY: t.value * dy + interpolate(t.value, [0, 1], [0, 170]) },
+      { rotate: `${t.value * spin}deg` },
+      { scale: interpolate(t.value, [0, 0.18, 1], [0.3, 1, 0.65]) },
     ],
   }));
 
@@ -177,7 +178,7 @@ const ConfettiPiece = ({ index }: { index: number }) => {
         style,
         {
           position: "absolute",
-          width: isCircle ? 10 : 8,
+          width: isCircle ? 10 : 7,
           height: isCircle ? 10 : 14,
           borderRadius: isCircle ? 5 : 2,
           backgroundColor: color,
@@ -185,14 +186,15 @@ const ConfettiPiece = ({ index }: { index: number }) => {
       ]}
     />
   );
-};
+});
+ConfettiPiece.displayName = "ConfettiPiece";
 
 const Confetti = () => (
   <View
     className="absolute inset-0 items-center justify-center"
     pointerEvents="none"
   >
-    {Array.from({ length: 18 }, (_, i) => (
+    {Array.from({ length: PIECE_COUNT }, (_, i) => (
       <ConfettiPiece key={i} index={i} />
     ))}
   </View>
@@ -200,87 +202,83 @@ const Confetti = () => (
 
 /* ─── scanning illustration ───────────────────────────────────────────────── */
 
-const PulseRing = ({ delay }: { delay: number }) => {
+/**
+ * One filled halo rather than several stroked rings — a solid layer composites
+ * far more cheaply than an animated border, which has to re-rasterise.
+ */
+const Halo = () => {
   const p = useSharedValue(0);
 
   useEffect(() => {
-    p.value = withDelay(
-      delay,
-      withRepeat(
-        withTiming(1, { duration: 2000, easing: Easing.out(Easing.quad) }),
-        -1,
-        false,
-      ),
+    p.value = withRepeat(
+      withTiming(1, { duration: 2200, easing: Easing.out(Easing.quad) }),
+      -1,
+      false,
     );
-  }, [p, delay]);
+  }, [p]);
 
   const style = useAnimatedStyle(() => ({
-    opacity: interpolate(p.value, [0, 0.3, 1], [0, 0.35, 0]),
-    transform: [{ scale: interpolate(p.value, [0, 1], [0.7, 1.9]) }],
+    opacity: interpolate(p.value, [0, 0.25, 1], [0, 0.22, 0]),
+    transform: [{ scale: interpolate(p.value, [0, 1], [0.75, 1.75]) }],
   }));
 
   return (
     <Animated.View
       style={style}
-      className="absolute w-44 h-44 rounded-full border-4 border-[#135bec]"
+      className="absolute w-48 h-48 rounded-full bg-[#135bec]"
     />
   );
 };
 
 const ScannerArt = () => {
-  const bob = useSharedValue(0);
+  const float = useSharedValue(0);
   const beam = useSharedValue(0);
 
   useEffect(() => {
-    bob.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0, { duration: 1400, easing: Easing.inOut(Easing.ease) }),
-      ),
-      -1,
-      false,
-    );
-    beam.value = withRepeat(
-      withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.quad) }),
+    float.value = withRepeat(
+      withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.ease) }),
       -1,
       true,
     );
-  }, [bob, beam]);
+    beam.value = withRepeat(
+      withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.quad) }),
+      -1,
+      true,
+    );
+  }, [float, beam]);
 
+  // Translate and scale only. Rotating this subtree forced a re-raster every
+  // frame, which is what made the old version stutter.
   const cardStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateY: interpolate(bob.value, [0, 1], [-7, 7]) },
-      { rotate: `${interpolate(bob.value, [0, 1], [-2.5, 2.5])}deg` },
+      { translateY: interpolate(float.value, [0, 1], [-8, 8]) },
+      { scale: interpolate(float.value, [0, 1], [0.98, 1.02]) },
     ],
   }));
 
   const beamStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: interpolate(beam.value, [0, 1], [6, 106]) }],
-    opacity: interpolate(beam.value, [0, 0.5, 1], [0.5, 1, 0.5]),
+    transform: [{ translateY: interpolate(beam.value, [0, 1], [0, 104]) }],
   }));
 
   return (
-    <View className="h-56 items-center justify-center">
-      <PulseRing delay={0} />
-      <PulseRing delay={700} />
-      <PulseRing delay={1400} />
+    <View className="h-52 items-center justify-center">
+      <Halo />
 
       <Animated.View
         style={cardStyle}
-        className="w-44 h-32 rounded-2xl bg-white dark:bg-[#1c2433] border-2 border-slate-200 dark:border-white/10 overflow-hidden"
+        className="w-40 h-32 rounded-2xl bg-white dark:bg-[#1c2433] border-2 border-slate-200 dark:border-white/10 overflow-hidden"
       >
-        {/* faux timetable grid */}
         <View className="flex-row px-3 pt-3 gap-1.5">
-          {[0, 1, 2, 3].map((i) => (
+          {[0, 1, 2].map((i) => (
             <View key={i} className="flex-1 h-3 rounded bg-[#135bec]/70" />
           ))}
         </View>
-        {[0, 1, 2, 3].map((row) => (
-          <View key={row} className="flex-row px-3 pt-2 gap-1.5">
-            {[0, 1, 2, 3].map((col) => (
+        {[0, 1, 2].map((row) => (
+          <View key={row} className="flex-row px-3 pt-2.5 gap-1.5">
+            {[0, 1, 2].map((col) => (
               <View
                 key={col}
-                className={`flex-1 h-3.5 rounded ${
+                className={`flex-1 h-4 rounded ${
                   (row + col) % 3 === 0
                     ? "bg-slate-300 dark:bg-slate-600"
                     : "bg-slate-100 dark:bg-slate-800"
@@ -290,10 +288,9 @@ const ScannerArt = () => {
           </View>
         ))}
 
-        {/* sweeping beam */}
         <Animated.View style={beamStyle} className="absolute left-0 right-0">
-          <View className="h-6 bg-[#1CB0F6]/25" />
-          <View className="h-1 bg-[#1CB0F6]" />
+          <View className="h-7 bg-[#1CB0F6]/20" />
+          <View className="h-[3px] bg-[#1CB0F6]" />
         </Animated.View>
       </Animated.View>
     </View>
@@ -302,50 +299,18 @@ const ScannerArt = () => {
 
 /* ─── progress bar ────────────────────────────────────────────────────────── */
 
-const ProgressBar = ({
-  value,
-  indeterminate,
-}: {
-  value: number;
-  indeterminate?: boolean;
-}) => {
-  const fill = useSharedValue(0);
-  const sweep = useSharedValue(0);
-
-  useEffect(() => {
-    if (indeterminate) {
-      sweep.value = withRepeat(
-        withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.ease) }),
-        -1,
-        false,
-      );
-    }
-  }, [indeterminate, sweep]);
-
-  useEffect(() => {
-    if (!indeterminate) {
-      fill.value = withSpring(value, { damping: 16, stiffness: 110, mass: 0.8 });
-    }
-  }, [value, indeterminate, fill]);
-
+const ProgressBar = ({ progress }: { progress: SharedValue<number> }) => {
   const fillStyle = useAnimatedStyle(() => ({
-    width: `${Math.max(fill.value * 100, 3)}%`,
+    width: `${Math.max(progress.value * 100, 2)}%`,
   }));
 
-  const sweepStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: interpolate(sweep.value, [0, 1], [-140, 340]) }],
-  }));
+  const percentProps = useAnimatedProps(
+    () => ({ text: `${Math.round(progress.value * 100)}%` }) as any,
+  );
 
   return (
-    <View className="h-4 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-      {indeterminate ? (
-        <Animated.View
-          style={sweepStyle}
-          className="h-full w-32 rounded-full bg-[#135bec]"
-        >
-          <View className="h-1.5 mx-2 mt-1 rounded-full bg-white/40" />
-        </Animated.View>
-      ) : (
+    <View>
+      <View className="h-4 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
         <Animated.View
           style={fillStyle}
           className="h-full rounded-full bg-[#58CC02]"
@@ -353,7 +318,21 @@ const ProgressBar = ({
           {/* the highlight that makes the fill read as glossy */}
           <View className="h-1.5 mx-2 mt-1 rounded-full bg-white/40" />
         </Animated.View>
-      )}
+      </View>
+      <AnimatedTextInput
+        editable={false}
+        underlineColorAndroid="transparent"
+        defaultValue="0%"
+        animatedProps={percentProps}
+        style={{
+          padding: 0,
+          marginTop: 6,
+          textAlign: "right",
+          fontSize: 12,
+          fontWeight: "800",
+          color: C.green,
+        }}
+      />
     </View>
   );
 };
@@ -405,152 +384,195 @@ const skipExplanation = (result: ScanResult) => {
   return result.detail || "Couldn't be created";
 };
 
-const ResultRow = ({ result }: { result: ScanResult }) => {
-  const isDark = useColorScheme() === "dark";
-  const pop = useSharedValue(0);
-  const badge = useSharedValue(0);
-  const style = statusStyles(result);
-  const isSkipped = result.status === "skipped";
+/**
+ * Rows all mount at once and stagger themselves on the UI thread. The old
+ * version mounted them from a chained JS timer, so every card cost a React
+ * render of the whole list and the cadence drifted whenever JS was busy.
+ */
+const ResultRow = React.memo(
+  ({ result, index }: { result: ScanResult; index: number }) => {
+    const isDark = useColorScheme() === "dark";
+    const pop = useSharedValue(0);
+    const badge = useSharedValue(0);
+    const style = statusStyles(result);
+    const isSkipped = result.status === "skipped";
+    const delay = index * ROW_INTERVAL_MS;
 
-  useEffect(() => {
-    pop.value = withSpring(1, { damping: 13, stiffness: 190, mass: 0.7 });
-    // Badge lands a beat after the card, so the tick reads as a reaction.
-    badge.value = withDelay(90, withSpring(1, { damping: 9, stiffness: 260 }));
-  }, [pop, badge]);
+    useEffect(() => {
+      pop.value = withDelay(
+        delay,
+        withSpring(1, { damping: 14, stiffness: 210, mass: 0.6 }),
+      );
+      // Badge lands a beat after the card, so the tick reads as a reaction.
+      badge.value = withDelay(
+        delay + 110,
+        withSpring(1, { damping: 9, stiffness: 280 }),
+      );
+    }, [pop, badge, delay]);
 
-  const cardStyle = useAnimatedStyle(() => ({
-    opacity: pop.value,
-    transform: [
-      { scale: interpolate(pop.value, [0, 1], [0.86, 1]) },
-      { translateY: interpolate(pop.value, [0, 1], [26, 0]) },
-    ],
-  }));
+    const cardStyle = useAnimatedStyle(() => ({
+      opacity: pop.value,
+      transform: [
+        { scale: interpolate(pop.value, [0, 1], [0.9, 1]) },
+        { translateY: interpolate(pop.value, [0, 1], [24, 0]) },
+      ],
+    }));
 
-  const badgeStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale: interpolate(badge.value, [0, 1], [0, 1]) },
-      { rotate: `${interpolate(badge.value, [0, 1], [-70, 0])}deg` },
-    ],
-  }));
+    const badgeStyle = useAnimatedStyle(() => ({
+      transform: [
+        { scale: badge.value },
+        { rotate: `${interpolate(badge.value, [0, 1], [-60, 0])}deg` },
+      ],
+    }));
 
-  return (
-    <Animated.View style={cardStyle} className="mb-3">
-      <View
-        style={{
-          borderBottomWidth: 4,
-          borderBottomColor: isSkipped
-            ? isDark
-              ? "#7A4E00"
-              : "#FFE0B2"
-            : isDark
-              ? "#0b1017"
-              : "#E5E7EB",
-        }}
-        className="flex-row items-center rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1c2433] p-3"
-      >
-        <Animated.View
-          style={[
-            badgeStyle,
-            {
-              backgroundColor: style.color,
-              borderBottomWidth: 3,
-              borderBottomColor: style.edge,
-            },
-          ]}
-          className="w-11 h-11 rounded-full items-center justify-center"
+    return (
+      <Animated.View style={cardStyle} className="mb-3">
+        <View
+          style={{
+            borderBottomWidth: 4,
+            borderBottomColor: isSkipped
+              ? isDark
+                ? "#7A4E00"
+                : "#FFE0B2"
+              : isDark
+                ? "#0b1017"
+                : "#E5E7EB",
+          }}
+          className="flex-row items-center rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1c2433] p-3"
         >
-          <Ionicons name={style.icon} size={22} color="white" />
-        </Animated.View>
-
-        <View className="flex-1 ml-3">
-          <Text
-            className="text-base font-extrabold text-slate-900 dark:text-white"
-            numberOfLines={1}
+          <Animated.View
+            style={[
+              badgeStyle,
+              {
+                backgroundColor: style.color,
+                borderBottomWidth: 3,
+                borderBottomColor: style.edge,
+              },
+            ]}
+            className="w-11 h-11 rounded-full items-center justify-center"
           >
-            {result.code}
-          </Text>
-          <Text
-            className="text-xs font-medium text-slate-500 dark:text-slate-400"
-            numberOfLines={1}
-          >
-            {result.name !== result.code ? result.name : "Not in the catalogue"}
-          </Text>
+            <Ionicons name={style.icon} size={22} color="white" />
+          </Animated.View>
 
-          {isSkipped ? (
+          <View className="flex-1 ml-3">
             <Text
-              className="text-xs font-bold text-[#E08600] mt-1"
-              numberOfLines={2}
+              className="text-base font-extrabold text-slate-900 dark:text-white"
+              numberOfLines={1}
             >
-              {skipExplanation(result)}
+              {result.code}
             </Text>
-          ) : (
-            <View className="flex-row flex-wrap mt-1.5">
-              {result.slots.slice(0, 3).map((slot) => (
-                <View
-                  key={slot}
-                  className="rounded-md bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 mr-1 mb-1"
-                >
-                  <Text className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                    {formatSlot(slot)}
-                  </Text>
-                </View>
-              ))}
-              {result.slots.length > 3 && (
-                <View className="rounded-md bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 mb-1">
-                  <Text className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                    +{result.slots.length - 3}
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
-        </View>
+            <Text
+              className="text-xs font-medium text-slate-500 dark:text-slate-400"
+              numberOfLines={1}
+            >
+              {result.name !== result.code
+                ? result.name
+                : "Not in the catalogue"}
+            </Text>
 
-        <Text
-          style={{ color: style.color }}
-          className="text-[10px] font-extrabold uppercase ml-2"
-        >
-          {style.label}
-        </Text>
-      </View>
-    </Animated.View>
-  );
-};
+            {isSkipped ? (
+              <Text
+                className="text-xs font-bold text-[#E08600] mt-1"
+                numberOfLines={2}
+              >
+                {skipExplanation(result)}
+              </Text>
+            ) : (
+              <View className="flex-row flex-wrap mt-1.5">
+                {result.slots.slice(0, 3).map((slot) => (
+                  <View
+                    key={slot}
+                    className="rounded-md bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 mr-1 mb-1"
+                  >
+                    <Text className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                      {formatSlot(slot)}
+                    </Text>
+                  </View>
+                ))}
+                {result.slots.length > 3 && (
+                  <View className="rounded-md bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 mb-1">
+                    <Text className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                      +{result.slots.length - 3}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+
+          <Text
+            style={{ color: style.color }}
+            className="text-[10px] font-extrabold uppercase ml-2"
+          >
+            {style.label}
+          </Text>
+        </View>
+      </Animated.View>
+    );
+  },
+);
+ResultRow.displayName = "ResultRow";
 
 /* ─── celebration ─────────────────────────────────────────────────────────── */
 
-const CountUp = ({ to }: { to: number }) => {
-  const [n, setN] = useState(0);
+/** Counts up on the UI thread — the old JS interval re-rendered every 45ms. */
+const CountUp = ({ to, color }: { to: number; color: string }) => {
+  const n = useSharedValue(0);
 
   useEffect(() => {
-    if (to === 0) return;
-    let current = 0;
-    const id = setInterval(
-      () => {
-        current += 1;
-        setN(current);
-        if (current >= to) clearInterval(id);
-      },
-      Math.max(320 / to, 45),
-    );
-    return () => clearInterval(id);
-  }, [to]);
+    n.value = withTiming(to, {
+      duration: 620,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [n, to]);
 
-  return <>{n}</>;
+  const props = useAnimatedProps(
+    () => ({ text: `${Math.round(n.value)}` }) as any,
+  );
+
+  return (
+    <AnimatedTextInput
+      editable={false}
+      underlineColorAndroid="transparent"
+      defaultValue="0"
+      animatedProps={props}
+      style={{
+        padding: 0,
+        textAlign: "center",
+        fontSize: 20,
+        fontWeight: "800",
+        color,
+      }}
+    />
+  );
 };
 
 const TrophyBadge = ({ tone }: { tone: "win" | "warn" }) => {
   const pop = useSharedValue(0);
+  const shine = useSharedValue(0);
 
   useEffect(() => {
     pop.value = withSequence(
-      withSpring(1.15, { damping: 8, stiffness: 200 }),
-      withSpring(1, { damping: 11, stiffness: 240 }),
+      withSpring(1.18, { damping: 7, stiffness: 220 }),
+      withSpring(1, { damping: 10, stiffness: 250 }),
     );
-  }, [pop]);
+    // A slow sweep keeps the finished state from feeling frozen.
+    shine.value = withDelay(
+      420,
+      withRepeat(withTiming(1, { duration: 2600 }), -1, false),
+    );
+  }, [pop, shine]);
 
   const style = useAnimatedStyle(() => ({
     transform: [{ scale: pop.value }],
+  }));
+
+  const shineStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(shine.value, [0, 0.1, 0.35, 1], [0, 0.45, 0, 0]),
+    transform: [
+      { rotate: "24deg" },
+      { translateX: interpolate(shine.value, [0, 0.35], [-70, 70]) },
+    ],
   }));
 
   return (
@@ -563,8 +585,13 @@ const TrophyBadge = ({ tone }: { tone: "win" | "warn" }) => {
           borderBottomColor: tone === "win" ? C.greenEdge : C.amberEdge,
         },
       ]}
-      className="w-24 h-24 rounded-full items-center justify-center"
+      className="w-24 h-24 rounded-full items-center justify-center overflow-hidden"
     >
+      <Animated.View
+        style={shineStyle}
+        className="absolute w-6 h-40 bg-white"
+        pointerEvents="none"
+      />
       <Ionicons
         name={tone === "win" ? "trophy" : "construct"}
         size={46}
@@ -598,54 +625,86 @@ export const TimetableScanProgress = ({
   onDismiss,
 }: Props) => {
   const isDark = useColorScheme() === "dark";
-  // Stable identity: this feeds a timer effect, and a fresh array every
-  // render would restart the reveal on any incidental re-render.
+  const feedback = useScanFeedback();
+
+  // Stable identity: this feeds timer effects, and a fresh array every render
+  // would restart them on any incidental re-render.
   const results = useMemo(() => data?.results ?? [], [data]);
 
-  const [revealed, setRevealed] = useState(0);
+  const [finished, setFinished] = useState(false);
   const [messageIndex, setMessageIndex] = useState(0);
+
+  const progress = useSharedValue(0);
   const msgFade = useSharedValue(1);
 
+  /* One bar for the whole flow: it creeps while the scan runs, then finishes
+     as the subjects land. It never goes backwards and never sits at 100%. */
   useEffect(() => {
-    if (phase === "scanning") setRevealed(0);
-  }, [phase]);
+    if (phase !== "scanning") return;
+    setFinished(false);
+    cancelAnimation(progress);
+    progress.value = 0;
+    progress.value = withTiming(SCAN_CEILING, {
+      duration: SCAN_CREEP_MS,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [phase, progress]);
+
+  useEffect(() => {
+    if (phase !== "reporting") return;
+
+    const total = results.length;
+    cancelAnimation(progress);
+
+    if (total === 0) {
+      progress.value = withTiming(1, { duration: 400 });
+      setFinished(true);
+      feedback("complete");
+      return;
+    }
+
+    const runFor = total * ROW_INTERVAL_MS;
+    progress.value = withTiming(1, { duration: runFor, easing: Easing.linear });
+
+    // Scheduled up front from one origin, so the cues stay in step with the
+    // card animations instead of drifting the way a chained timer does.
+    const timers = results.map((result, i) =>
+      setTimeout(
+        () => feedback(result.status === "skipped" ? "skip" : "pop"),
+        i * ROW_INTERVAL_MS,
+      ),
+    );
+    const done = setTimeout(() => {
+      setFinished(true);
+      feedback("complete");
+    }, runFor + 120);
+
+    return () => {
+      timers.forEach(clearTimeout);
+      clearTimeout(done);
+    };
+  }, [phase, results, progress, feedback]);
 
   // Cycle the copy with a soft cross-fade rather than a hard swap.
   useEffect(() => {
     if (phase !== "scanning") return;
     const id = setInterval(() => {
       msgFade.value = withSequence(
-        withTiming(0, { duration: 220 }),
-        withTiming(1, { duration: 320 }),
+        withTiming(0, { duration: 200 }),
+        withTiming(1, { duration: 300 }),
       );
       setTimeout(
         () => setMessageIndex((i) => (i + 1) % SCANNING_MESSAGES.length),
-        220,
+        200,
       );
-    }, 2000);
+    }, 2200);
     return () => clearInterval(id);
   }, [phase, msgFade]);
 
   const msgStyle = useAnimatedStyle(() => ({
     opacity: msgFade.value,
-    transform: [{ translateY: interpolate(msgFade.value, [0, 1], [8, 0]) }],
+    transform: [{ translateY: interpolate(msgFade.value, [0, 1], [10, 0]) }],
   }));
-
-  // Walk the report one subject at a time, with a tick on each.
-  useEffect(() => {
-    if (phase !== "reporting" || revealed >= results.length) return;
-    const id = setTimeout(() => {
-      setRevealed((n) => n + 1);
-      tick(results[revealed]?.status === "skipped");
-    }, ROW_INTERVAL_MS);
-    return () => clearTimeout(id);
-  }, [phase, revealed, results]);
-
-  const finished = phase === "reporting" && revealed >= results.length;
-
-  useEffect(() => {
-    if (finished) tick(true);
-  }, [finished]);
 
   const skipped = results.filter((r) => r.status === "skipped");
   const added = results.filter((r) => r.status === "created").length;
@@ -697,11 +756,8 @@ export const TimetableScanProgress = ({
                 </Text>
               </Animated.View>
               <View className="mt-8">
-                <ProgressBar value={0} indeterminate />
+                <ProgressBar progress={progress} />
               </View>
-              <Text className="text-xs font-semibold text-slate-400 dark:text-slate-500 text-center mt-4">
-                Hang tight — this can take up to a minute
-              </Text>
             </View>
           )}
 
@@ -718,7 +774,6 @@ export const TimetableScanProgress = ({
                     {skipped.length ? "Almost there!" : "Timetable ready!"}
                   </Text>
 
-                  {/* stat pills */}
                   <View className="flex-row justify-center mt-4 gap-2">
                     {[
                       { n: added, label: "added", color: C.green },
@@ -730,15 +785,10 @@ export const TimetableScanProgress = ({
                       .map((s) => (
                         <View
                           key={s.label}
-                          style={{ borderColor: s.color }}
+                          style={{ borderColor: s.color, minWidth: 74 }}
                           className="rounded-2xl border-2 bg-white dark:bg-[#1c2433] px-3 py-2 items-center"
                         >
-                          <Text
-                            style={{ color: s.color }}
-                            className="text-xl font-extrabold"
-                          >
-                            <CountUp to={s.n} />
-                          </Text>
+                          <CountUp to={s.n} color={s.color} />
                           <Text className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">
                             {s.label}
                           </Text>
@@ -752,19 +802,17 @@ export const TimetableScanProgress = ({
                     Adding your subjects
                   </Text>
                   <Text className="text-sm font-bold text-[#135bec] mt-1">
-                    {Math.min(revealed + 1, results.length)} of {results.length}
+                    {results.length} found on your timetable
                   </Text>
                 </View>
               )}
 
               <View className="mb-5 mt-1">
-                <ProgressBar
-                  value={results.length ? revealed / results.length : 1}
-                />
+                <ProgressBar progress={progress} />
               </View>
 
-              {results.slice(0, revealed).map((result) => (
-                <ResultRow key={result.code} result={result} />
+              {results.map((result, index) => (
+                <ResultRow key={result.code} result={result} index={index} />
               ))}
 
               {results.length === 0 && (
@@ -789,10 +837,11 @@ export const TimetableScanProgress = ({
                 </View>
               )}
 
-              {/* skipped detail */}
               {finished && skipped.length > 0 && (
                 <LinearGradient
-                  colors={isDark ? ["#3a2a05", "#2a1f08"] : ["#FFF7E6", "#FFEFD0"]}
+                  colors={
+                    isDark ? ["#3a2a05", "#2a1f08"] : ["#FFF7E6", "#FFEFD0"]
+                  }
                   className="rounded-2xl p-4 mt-2 border-2 border-[#FF9600]/40"
                 >
                   <View className="flex-row items-center mb-2">
@@ -842,9 +891,7 @@ export const TimetableScanProgress = ({
               )}
               <ChunkyButton
                 label={finished ? "SEE MY TIMETABLES" : "HANG TIGHT…"}
-                color={
-                  finished ? (skipped.length ? C.grey : C.green) : C.grey
-                }
+                color={finished ? (skipped.length ? C.grey : C.green) : C.grey}
                 edge={
                   finished
                     ? skipped.length
